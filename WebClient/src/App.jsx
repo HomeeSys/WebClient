@@ -1,4 +1,5 @@
 import NavigationBar from './components/NavigationBar';
+import MeasurementsLive from './pages/MeasurementsLive';
 import Devices from './pages/Devices';
 import Measurements from './pages/Measurements';
 import Requests from './pages/Requests';
@@ -12,6 +13,7 @@ function App() {
       <NavigationBar/>
       <Routes>
         <Route path="/devices" element={<Devices />} />
+        <Route path="/measurementslive" element={<MeasurementsLive />} />
         <Route path="/measurements" element={<Measurements />} />
         <Route path="/requests" element={<Requests />} />
         <Route path="/raports" element={<Raports />} />

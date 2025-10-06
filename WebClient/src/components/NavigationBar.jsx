@@ -8,6 +8,9 @@ function NavigationBar() {
         <Link to="/devices" style={{ textDecoration: 'none', color: 'inherit' }}>
           <li>Devices</li>
         </Link>
+        <Link to="/measurementslive" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <li>Measurements Live</li>
+        </Link>
         <Link to="/measurements" style={{ textDecoration: 'none', color: 'inherit' }}>
           <li>Measurements</li>
         </Link>
