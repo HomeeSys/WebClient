@@ -2,7 +2,7 @@ import * as React from 'react';
 import Box from '@mui/material/Box';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
+import TableCell, { tableCellClasses } from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TablePagination from '@mui/material/TablePagination';
@@ -20,20 +20,32 @@ import ListItemText from '@mui/material/ListItemText';
 import Badge from '@mui/material/Badge';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import DialogActions from '@mui/material/DialogActions';
-import { HubConnectionBuilder } from '@microsoft/signalr';
+import * as SignalR from '@microsoft/signalr';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import DeleteIcon from '@mui/icons-material/Delete';
 import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+dayjs.extend(customParseFormat);
+import Tooltip from '@mui/material/Tooltip';
+import Divider from '@mui/material/Divider';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import CloseIcon from '@mui/icons-material/Close';
+import { styled } from '@mui/material/styles';
+import SearchOffIcon from '@mui/icons-material/SearchOff';
+import { alpha } from '@mui/material/styles';
+import Collapse from '@mui/material/Collapse';
 
 const columns = [
-  { id: 'day', label: 'Dzień', minWidth: 110 },
-  { id: 'hour', label: 'Godzina', minWidth: 80 },
-  { id: 'deviceNumber', label: 'Device Number', minWidth: 220 },
-  { id: 'deviceName', label: 'Device Name', minWidth: 220 },
+  { id: 'day', label: 'Day', minWidth: 50 },
+  { id: 'hour', label: 'Hour', minWidth: 50 },
+  { id: 'deviceName', label: 'Device Name', minWidth: 120 },
+  { id: 'deviceNumber', label: 'Device Number', minWidth: 300 },
   { id: 'location', label: 'Location', minWidth: 120 }
 ];
 
@@ -59,27 +71,81 @@ function stableSort(array, comparator) {
   return stabilizedThis.map((el) => el[0]);
 }
 
+// Styled table used inside details dialog
+const StyledTableCell = styled(TableCell)(({ theme }) => ({
+  // show grid lines: borders for head & body cells
+  [`&.${tableCellClasses.head}`]: {
+    backgroundColor: theme.palette.mode === 'dark' ? '#111' : theme.palette.common.black,
+    color: theme.palette.common.white,
+    borderBottom: `2px solid ${theme.palette.divider}`,
+    borderRight: `1px solid ${theme.palette.divider}`,
+    '&:last-child': {
+      borderRight: 'none'
+    }
+  },
+  [`&.${tableCellClasses.body}`]: {
+    fontSize: 14,
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    borderRight: `1px solid ${theme.palette.divider}`,
+    '&:last-child': {
+      borderRight: 'none'
+    }
+  },
+}));
+
+const StyledTableRow = styled(TableRow)(({ theme }) => ({
+  '&:nth-of-type(odd)': {
+    backgroundColor: theme.palette.action.hover,
+  },
+  // keep borders on the last row so the bottom grid line is visible
+}));
+ 
+// map backend keys -> frontend labels (edit as you like)
+const PARAMETER_LABELS = {
+  Temperature: 'Temperature',
+  Humidity: 'Humidity',
+  CO2: 'Carbon Dioxide (CO₂)',
+  VOC: 'Volatile Organic Matter',
+  ParticulateMatter1: 'Particulate Matter 1µm',
+  ParticulateMatter2v5: 'Particulate Matter 2.5µm',
+  ParticulateMatter10: 'Particulate Matter 10µm',
+  Formaldehyde: 'Formaldehyde',
+  CO: 'Carbon Monoxide (CO)',
+  O3: 'Ozone (O₃)',
+  Ammonia: 'Ammonia',
+  Airflow: 'Airflow',
+  AirIonizationLevel: 'Air Ionization',
+  O2: 'Oxygen level (O₂)',
+  Radon: 'Radon',
+  Illuminance: 'Illuminance',
+  SoundLevel: 'Sound Level'
+};
+
+const labelForParameter = (key) => {
+  if (!key) return '';
+  return PARAMETER_LABELS[key] ?? key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_\-]/g, ' ');
+};
+
 function MeasurementsLive() {
+  {/* Filters */}
+  const [searchText, setSearchText] = React.useState('');
+  const [minDate, setMinDate] = React.useState(null);
+  const [maxDate, setMaxDate] = React.useState(null);
+  const [dayFrom, setDayFrom] = React.useState(null);
+  const [dayTo, setDayTo] = React.useState(null);
   const [order, setOrder] = React.useState('asc');
   const [orderBy, setOrderBy] = React.useState('registerDate');
   const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(10);
-
-  const [filters, setFilters] = React.useState({
-    registerDate: '',
-    deviceId: '',
-    deviceNumber: '',
-    location: ''
-  });
+  // must match one of TablePagination rowsPerPageOptions (25, 50, 100)
+  const [rowsPerPage, setRowsPerPage] = React.useState(25);
 
   const [measurements, setMeasurements] = React.useState([]);
   const [open, setOpen] = React.useState(false);
   const [selectedDetails, setSelectedDetails] = React.useState(null);
   const [newIds, setNewIds] = React.useState([]);
+  const [displayedIds, setDisplayedIds] = React.useState([]);
   const [timeFrom, setTimeFrom] = React.useState(null);
   const [timeTo, setTimeTo] = React.useState(null);
-  const [dayFrom, setDayFrom] = React.useState(null);
-  const [dayTo, setDayTo] = React.useState(null);
   const [filterDialogOpen, setFilterDialogOpen] = React.useState(false);
   const [devices, setDevices] = React.useState([]);
   const [filterMode, setFilterMode] = React.useState('deviceNumber'); // 'deviceNumber' or 'deviceName'
@@ -91,12 +157,12 @@ function MeasurementsLive() {
     if (dayTo) count++;
     if (timeFrom) count++;
     if (timeTo) count++;
-    Object.values(filters).forEach(val => {
-      if (val) count++;
-    });
     return count;
-  }, [dayFrom, dayTo, timeFrom, timeTo, filters]);
+  }, [dayFrom, dayTo, timeFrom, timeTo]);
 
+  const HandleSearchChanged = (newSearchText) => {
+    setSearchText(newSearchText);
+  };
 
   // Pobierz urządzenia na start
   const fetchDevices = React.useCallback(() => {
@@ -112,9 +178,10 @@ function MeasurementsLive() {
 
   // Obsługa websocket dla urządzeń (aktualizacja listy urządzeń)
   React.useEffect(() => {
-    const connection = new HubConnectionBuilder()
+    const connection = new SignalR.HubConnectionBuilder()
       .withUrl('https://localhost:6061/devicehub')
       .withAutomaticReconnect()
+      .configureLogging(SignalR.LogLevel.None)
       .build();
 
     connection.start()
@@ -132,29 +199,25 @@ function MeasurementsLive() {
 
   // SignalR dla pomiarów
   React.useEffect(() => {
-    const connection = new HubConnectionBuilder()
+    const connection = new SignalR.HubConnectionBuilder()
       .withUrl('https://localhost:6063/measurementhub')
       .withAutomaticReconnect()
+      .configureLogging(SignalR.LogLevel.None)
       .build();
 
     connection.start()
       .then(() => {
         connection.on('MeasurementCreated', (createdMeasurementSet) => {
           const dateObj = new Date(createdMeasurementSet.registerDate);
-
-          console.log(devices);
-          console.log(createdMeasurementSet);
-
-          // Pobierz lokalizację na podstawie deviceNumber
           const device = devices.find(d => d.deviceNumber === createdMeasurementSet.deviceNumber);
 
-          console.log(device);
+          console.log(`[MEASUREMENT CREATED] - ${JSON.stringify(createdMeasurementSet, null, 2)}`);
 
           setMeasurements(prev => [
             {
-              id: createdMeasurementSet.id, // <-- to jest kluczowe!
-              day: dayjs(dateObj).format('YYYY-MM-DD'),
-              hour: dayjs(dateObj).format('HH:mm'),
+              id: createdMeasurementSet.id,
+              day: dayjs(dateObj).format('DD.MM.YYYY'),
+              hour: dayjs(dateObj).format('HH:mm:ss'),
               deviceNumber: createdMeasurementSet.deviceNumber,
               deviceName: device?.name || '',
               location: device?.location.name || '',
@@ -207,128 +270,259 @@ function MeasurementsLive() {
     setPage(0);
   };
 
-  const handleFilterChange = (columnId) => (event) => {
-    setFilters((prev) => ({
-      ...prev,
-      [columnId]: event.target.value
-    }));
-    setPage(0);
-  };
-
   const handleClearFilters = () => {
-    setFilters({
-      registerDate: '',
-      deviceId: '',
-      deviceNumber: '',
-      location: ''
-    });
     setTimeFrom(null);
     setTimeTo(null);
     setDayFrom(null);
     setDayTo(null);
+    setSearchText('');
+    setPage(0);
   };
 
   const handleFilterModeChange = (event) => {
     setFilterMode(event.target.value);
-    setFilters((prev) => ({
-      ...prev,
-      deviceNumber: '',
-      deviceName: ''
-    }));
   };
 
   const filteredMeasurements = React.useMemo(() => {
+    // interpret user's picks as inclusive whole-day range
+
     return measurements.filter((row) => {
-      // Filtrowanie po dniu
+      // build a full datetime from row.day + row.hour when available
+      let rowDate = null;
+      if (row.day && row.hour) {
+        rowDate = dayjs(
+          `${row.day} ${row.hour}`,
+          ['DD.MM.YYYY HH:mm:ss', 'DD.MM.YYYY HH:mm', 'YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DD HH:mm'],
+        );
+      } else if (row.day) {
+        rowDate = dayjs(row.day, ['DD.MM.YYYY', 'YYYY-MM-DD']);
+      }
+
+      // date range filtering (inclusive)
       if (dayFrom || dayTo) {
-        if (dayFrom && dayjs(row.day).isBefore(dayjs(dayFrom), 'day')) return false;
-        if (dayTo && dayjs(row.day).isAfter(dayjs(dayTo), 'day')) return false;
+        if (!rowDate || !rowDate.isValid()) return false;
+        if (dayFrom && rowDate.isBefore(dayFrom)) return false;
+        if (dayTo && rowDate.isAfter(dayTo)) return false;
       }
-      // Filtrowanie po godzinie
+
+      // time-of-day filtering (if you use selects/strings for timeFrom/timeTo)
       if (timeFrom || timeTo) {
-        if (timeFrom && row.hour < dayjs(timeFrom).format('HH:mm')) return false;
-        if (timeTo && row.hour > dayjs(timeTo).format('HH:mm')) return false;
+        if (!row.hour) return false;
+        const rowTime = dayjs(row.hour, ['HH:mm:ss', 'HH:mm']);
+        if (!rowTime.isValid()) return false;
+        if (timeFrom) {
+          const tf = dayjs(timeFrom, ['HH:mm:ss', 'HH:mm']);
+          if (!tf.isValid()) return false;
+          if (rowTime.isBefore(tf)) return false;
+        }
+        if (timeTo) {
+          const tt = dayjs(timeTo, ['HH:mm:ss', 'HH:mm']);
+          if (!tt.isValid()) return false;
+          if (rowTime.isAfter(tt)) return false;
+        }
       }
-      // Pozostałe filtry
-      return columns.every((col) => {
-        const filterValue = filters[col.id];
-        if (!filterValue) return true;
-        // Tylko jeden filtr: deviceNumber lub deviceName
-        if (col.id === 'deviceNumber' && filterMode !== 'deviceNumber') return true;
-        if (col.id === 'deviceName' && filterMode !== 'deviceName') return true;
-        return row[col.id]?.toLowerCase().includes(filterValue.toLowerCase());
-      });
+
+      // searchText should match any of: location, deviceName, deviceNumber
+      if (searchText) {
+        const s = searchText.toLowerCase();
+        const matchesLocation = String(row.location ?? '').toLowerCase().includes(s);
+        const matchesDeviceName = String(row.deviceName ?? '').toLowerCase().includes(s);
+        const matchesDeviceNumber = String(row.deviceNumber ?? '').toLowerCase().includes(s);
+        if (!matchesLocation && !matchesDeviceName && !matchesDeviceNumber) return false;
+      }
+
+      return true;
     });
-  }, [filters, measurements, timeFrom, timeTo, dayFrom, dayTo, filterMode]);
+  }, [measurements, timeFrom, timeTo, dayFrom, dayTo, searchText]);
 
   const sortedRows = React.useMemo(
     () =>
       stableSort(filteredMeasurements, getComparator(order, orderBy))
         .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
-    [order, orderBy, page, rowsPerPage, filteredMeasurements]
+    [order, orderBy, page, rowsPerPage, filteredMeasurements, searchText]
   );
 
   const handleRowClick = (details, id) => {
     setSelectedDetails(details);
     setOpen(true);
+    // mark as no longer "new"
     setNewIds(prev => prev.filter(newId => newId !== id));
+    // remember that this measurement was displayed
+    setDisplayedIds(prev => (prev.includes(id) ? prev : [id, ...prev]));
   };
 
   const handleClose = () => {
+    // only close dialog here; clear details after transition finishes
     setOpen(false);
-    setSelectedDetails(null);
+  };
+
+  // update min/max when measurements change, but DO NOT modify user's selected filters
+  React.useEffect(() => {
+    if (!measurements || measurements.length === 0) {
+      // no measurements -> clear range and the From/To values
+      setMinDate(null);
+      setMaxDate(null);
+      setDayFrom(null);
+      setDayTo(null);
+      return;
+    }
+
+    // parse measurement datetime from row.day + row.hour
+    const dates = measurements
+      .map((m) => {
+        const combined = `${m.day} ${m.hour ?? ''}`.trim();
+        // try common formats used in this component
+        return dayjs(combined, ['DD.MM.YYYY HH:mm:ss', 'DD.MM.YYYY HH:mm', 'YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DD HH:mm']);
+      })
+      .filter((d) => d.isValid());
+
+    if (dates.length === 0) {
+      setMinDate(null);
+      setMaxDate(null);
+      return;
+    }
+
+    // find min / max
+    let min = dates[0];
+    let max = dates[0];
+    for (let i = 1; i < dates.length; i++) {
+      if (dates[i].isBefore(min)) min = dates[i];
+      if (dates[i].isAfter(max)) max = dates[i];
+    }
+
+    // round min down and max up to 5-minute grid so pickers (5-min step) can select around actual measurements
+    const roundDown5 = (d) => {
+      const base = d.second(0).millisecond(0);
+      const delta = base.minute() % 5;
+      return base.subtract(delta, 'minute');
+    };
+    const roundUp5 = (d) => {
+      const base = d.second(0).millisecond(0);
+      const rem = base.minute() % 5;
+      return rem === 0 ? base : base.add(5 - rem, 'minute');
+    };
+
+    const roundedMin = roundDown5(min);
+    const roundedMax = roundUp5(max);
+
+    // only update available range — do NOT change dayFrom/dayTo (preserve user's selection)
+    setMinDate(roundedMin);
+    setMaxDate(roundedMax);
+  }, [measurements]);
+
+  // delete measurement locally only (no backend request)
+  const handleDeleteMeasurement = (id) => {
+    setMeasurements((prev) => prev.filter((m) => m.id !== id));
+    setNewIds((prev) => prev.filter((n) => n !== id));
+    setDisplayedIds((prev) => prev.filter((n) => n !== id));
   };
 
   return (
-    <Box sx={{ width: '100%', mt: 4 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4" sx={{ flexGrow: 1 }}>
-          Measurements
-        </Typography>
-        <Badge
-          color="primary"
-          badgeContent={activeFiltersCount > 0 ? activeFiltersCount : null}
-          sx={{ '& .MuiBadge-badge': { fontSize: 12, padding: '0 6px' } }}
-        >
-          <IconButton onClick={() => setFilterDialogOpen(true)}>
-            <FilterListIcon />
-          </IconButton>
-        </Badge>
-      </Box>
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-        <TableContainer sx={{ minHeight: `${rowsPerPage * 53 + 56}px`, maxHeight: `${rowsPerPage * 53 + 56}px` }}>
-          <Table stickyHeader aria-label="measurements table">
-            <TableHead>
-              <TableRow>
-                <TableCell style={{ minWidth: 60, fontWeight: 'bold' }}>
-                  Index
-                </TableCell>
-                {columns.map((column) => (
-                  <TableCell
-                    key={column.id}
-                    style={{ minWidth: column.minWidth, fontWeight: 'bold' }}
-                    sortDirection={orderBy === column.id ? order : false}
-                  >
-                    <TableSortLabel
-                      active={orderBy === column.id}
-                      direction={orderBy === column.id ? order : 'asc'}
-                      onClick={(event) => handleRequestSort(event, column.id)}
-                    >
-                      {column.label}
-                    </TableSortLabel>
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sortedRows.length === 0 ? (
+    <Box sx={{ 
+      width: '100%', 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      overflow: 'hidden'
+    }}>
+
+      {/* Search and filtering */}
+      <Paper>
+        <Box sx={{ display: 'flex', gap: 1, mt: 1, mb: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            <TextField
+              label="Search"
+              variant="outlined"
+              size="small"
+              id="measurement-search-input"
+              sx={{ minWidth: 300 }}
+              onChange={(e) => {
+                HandleSearchChanged(e.target.value);
+                setPage(0); // reset pagination so new filter is immediately visible
+              }}
+            />
+          <Badge
+            color="primary"
+            badgeContent={activeFiltersCount > 0 ? activeFiltersCount : null}
+            sx={{ '& .MuiBadge-badge': { fontSize: 12, padding: '0 6px' } }}>
+            <IconButton onClick={() => setFilterDialogOpen(true)}>
+              <FilterListIcon />
+            </IconButton>
+          </Badge>
+        </Box>
+      </Paper>
+      
+      {/* Divider */}
+      <Divider />
+
+      {/* Table and pagination content */}
+      <Paper sx={{ 
+        flexGrow: 1, 
+        display: 'flex', 
+        flexDirection: 'column',
+        overflow: 'hidden',
+        position: 'relative'
+      }}>
+        <TableContainer sx={{ flexGrow: 1, overflow: 'auto', minHeight: 0 }}>
+          <Collapse in={filteredMeasurements.length === 0} timeout={300} unmountOnExit>
+            <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 3 }}>
+              <Paper elevation={0} sx={{ width: '100%', textAlign: 'center', py: 6, bgcolor: 'transparent' }}>
+                <SearchOffIcon sx={{ fontSize: 64, color: 'action.disabled', mb: 1 }} />
+                <Typography variant="h6">No measurements found!</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  If you have just started the system, please wait a moment for measurements to arrive.
+                </Typography>
+              </Paper>
+            </Box>
+          </Collapse>
+
+          <Collapse in={filteredMeasurements.length > 0} timeout={400} unmountOnExit>
+            <Table stickyHeader aria-label="measurements table">
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={columns.length + 1} align="center" sx={{ py: 6, color: '#888' }}>
-                    Brak pomiarów do wyświetlenia.
+                  <TableCell
+                    sx={(theme) => ({
+                      minWidth: 10,
+                      maxWidth: 40,
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                      px: 1,
+                    })}
+                  >
+                    Index
+                  </TableCell>
+                  <TableCell style={{ minWidth: 80, fontWeight: 'bold', textAlign: 'center' }}>
+                    Status
+                  </TableCell>
+                  {columns.map((column) => (
+                    <TableCell
+                      key={column.id}
+                      style={{ minWidth: column.minWidth, fontWeight: 'bold' }}
+                      sortDirection={orderBy === column.id ? order : false}
+                    >
+                      <TableSortLabel
+                        active={orderBy === column.id}
+                        direction={orderBy === column.id ? order : 'asc'}
+                        onClick={(event) => handleRequestSort(event, column.id)}
+                      >
+                        {column.label}
+                      </TableSortLabel>
+                    </TableCell>
+                  ))}
+                  <TableCell
+                    sx={(theme) => ({
+                      minWidth: 40,
+                      maxWidth: 40,
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                      borderLeft: `1px solid ${theme.palette.divider}` // vertical separator before Actions
+                    })}
+                  >
+                    Actions
                   </TableCell>
                 </TableRow>
-              ) : (
-                sortedRows.map((row, idx) => {
+              </TableHead>
+              <TableBody>
+                {sortedRows.map((row, idx) => {
                   const tableIndex = page * rowsPerPage + idx + 1;
                   return (
                     <TableRow
@@ -338,23 +532,45 @@ function MeasurementsLive() {
                       onClick={() => handleRowClick(row.details, row.id)}
                       sx={{ cursor: 'pointer' }}
                     >
-                      {/* Numer wystąpienia z badge jeśli nowy */}
-                      <TableCell sx={{ position: 'relative', pr: 3 }}>
+                      <TableCell sx={{ pr: 1, textAlign: 'center' }}>
                         <span>{tableIndex}</span>
-                        {newIds.includes(row.id) && (
-                          <Badge
-                            color="primary"
-                            badgeContent="New"
-                            sx={{
-                              position: 'absolute',
-                              top: '30%',
-                              right: '70%',
-                              transform: 'translateY(-50%)',
-                              '& .MuiBadge-badge': { fontSize: 12, padding: '0 6px' }
-                            }}
-                            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                          />
-                        )}
+                      </TableCell>
+                      <TableCell sx={{ pr: 1, textAlign: 'center' }}>
+                        {newIds.includes(row.id) ? (
+                          <Box
+                            component="span"
+                            sx={(theme) => ({
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              px: 1.2,
+                              py: 0.4,
+                              borderRadius: '999px',
+                              bgcolor: theme.palette.primary.main,
+                              color: theme.palette.primary.contrastText,
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                            })}
+                          >
+                            New
+                          </Box>
+                        ) : displayedIds.includes(row.id) ? (
+                          <Box
+                            component="span"
+                            sx={(theme) => ({
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              px: 1.2,
+                              py: 0.4,
+                              borderRadius: '999px',
+                              bgcolor: theme.palette.action.disabledBackground,
+                              color: theme.palette.text.primary,
+                              fontSize: '0.75rem',
+                              fontWeight: 500,
+                            })}
+                          >
+                            Displayed
+                          </Box>
+                        ) : null}
                       </TableCell>
                       {columns.map((column) => (
                         <TableCell key={column.id}>
@@ -363,139 +579,205 @@ function MeasurementsLive() {
                             : row[column.id] ?? ''}
                         </TableCell>
                       ))}
+                      <TableCell
+                        sx={(theme) => ({
+                          pr: 1,
+                          textAlign: 'center',
+                          borderLeft: `1px solid ${theme.palette.divider}` // vertical separator
+                        })}
+                      >
+                        <IconButton
+                          size="small"
+                          color="error"
+                          sx={(theme) => ({
+                            backgroundColor: 'transparent',
+                            color: theme.palette.error.main,
+                            transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
+                            '&:hover': {
+                              backgroundColor: alpha(theme.palette.error.main, 0.12),
+                              color: theme.palette.error.dark,
+                            },
+                            '&:active': {
+                              backgroundColor: alpha(theme.palette.error.main, 0.18),
+                            },
+                          })}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteMeasurement(row.id);
+                          }}
+                        >
+                          <VisibilityOffIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
                     </TableRow>
                   );
-                })
-              )}
-              {/* Puste wiersze dla stałej wysokości */}
-              {sortedRows.length < rowsPerPage && Array.from({ length: rowsPerPage - sortedRows.length }).map((_, i) => (
-                <TableRow key={`empty-${i}`} style={{ height: 53 }}>
-                  <TableCell />
-                  {columns.map((column) => (
-                    <TableCell key={column.id} />
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                })}
+
+                {/* Puste wiersze dla stałej wysokości */}
+                {sortedRows.length < rowsPerPage && Array.from({ length: rowsPerPage - sortedRows.length }).map((_, i) => (
+                  <TableRow key={`empty-${i}`} style={{ height: 53 }}>
+                    <TableCell />{/* Index */}
+                    <TableCell />{/* Status */}
+                    {columns.map((column) => (
+                      <TableCell key={column.id} />
+                    ))}
+                    <TableCell sx={(theme) => ({ borderLeft: `1px solid ${theme.palette.divider}` })} />{/* Actions (last) */}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Collapse>
         </TableContainer>
-        <TablePagination
-          rowsPerPageOptions={[10, 25, 50, 100]}
-          component="div"
-          count={filteredMeasurements.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
+
+      <Divider/>
+
+      {/* Pagination */}
+       <TablePagination
+         rowsPerPageOptions={[25, 50, 100]}
+         component="div"
+         count={filteredMeasurements.length}
+         rowsPerPage={rowsPerPage}
+         page={page}
+         onPageChange={handleChangePage}
+         onRowsPerPageChange={handleChangeRowsPerPage}
+         sx={{ 
+           flexShrink: 0,  // prevent pagination from shrinking
+         }}
+       />
       </Paper>
+
       {/* Okno dialogowe z filtrami */}
-      <Dialog open={filterDialogOpen} onClose={() => setFilterDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Filtry</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Typography variant="subtitle2">Dzień</Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <DatePicker
-                    label="Od dnia"
-                    value={dayFrom}
-                    onChange={setDayFrom}
-                    slotProps={{ textField: { size: 'small', variant: 'standard' } }}
-                  />
-                  <DatePicker
-                    label="Do dnia"
-                    value={dayTo}
-                    onChange={setDayTo}
-                    slotProps={{ textField: { size: 'small', variant: 'standard' } }}
-                  />
-                </Box>
-                <Typography variant="subtitle2">Godzina</Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <TimePicker
-                    label="Od godziny"
-                    value={timeFrom}
-                    onChange={setTimeFrom}
-                    ampm={false}
-                    slotProps={{ textField: { size: 'small', variant: 'standard' } }}
-                  />
-                  <TimePicker
-                    label="Do godziny"
-                    value={timeTo}
-                    onChange={setTimeTo}
-                    ampm={false}
-                    slotProps={{ textField: { size: 'small', variant: 'standard' } }}
-                  />
-                </Box>
-              </Box>
-            </LocalizationProvider>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Typography variant="subtitle2">Pozostałe</Typography>
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 1 }}>
-                <TextField
-                  select
-                  label="Filtruj po"
-                  value={filterMode}
-                  onChange={handleFilterModeChange}
-                  variant="standard"
-                  size="small"
-                  sx={{ minWidth: 120 }}
-                  SelectProps={{ native: true }}
-                >
-                  <option value="deviceNumber">Device Number</option>
-                  <option value="deviceName">Device Name</option>
-                </TextField>
-                <TextField
-                  key={filterMode}
-                  label={filterMode === 'deviceNumber' ? 'Device Number' : 'Device Name'}
-                  variant="standard"
-                  value={filters[filterMode]}
-                  onChange={handleFilterChange(filterMode)}
-                  placeholder={`Filtruj`}
-                  size="small"
-                  sx={{ minWidth: 220 }}
-                />
-              </Box>
-              {columns.filter(col => col.id !== 'day' && col.id !== 'hour' && col.id !== 'deviceNumber' && col.id !== 'deviceName').map((column) => (
-                <TextField
-                  key={column.id}
-                  label={column.label}
-                  variant="standard"
-                  value={filters[column.id]}
-                  onChange={handleFilterChange(column.id)}
-                  placeholder={`Filtruj`}
-                  size="small"
-                  sx={{ minWidth: column.minWidth, mt: 1 }}
-                />
-              ))}
-            </Box>
+      <Dialog open={filterDialogOpen} onClose={() => setFilterDialogOpen(false)} maxWidth="md">
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', padding: 2, paddingLeft: 2, paddingRight: 2 }}>
+          <Box component="span">Filters</Box>
+          <IconButton
+            aria-label="close"
+            onClick={() => setFilterDialogOpen(false)}
+            sx={(theme) => ({ ml: 'auto' })}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <Divider />
+
+        <DialogContent sx={{ padding: 2}}>
+          <Box>
+            <Paper sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                {/* From picker (disabled while no measurements). min/max prevent selecting outside available range */}
+                <DateTimePicker
+                  label="From"
+                  value={dayFrom ?? null}
+                  onChange={(v) => {
+                    // normalize picker output to a dayjs instance or null
+                    setDayFrom(v ? dayjs(v) : null);
+                    setPage(0); // apply filter immediately
+                  }}
+                   minDateTime={minDate ?? undefined}
+                   maxDateTime={maxDate ?? undefined}
+                   disabled={!minDate || !maxDate}
+                   inputFormat="DD.MM.YYYY HH:mm:ss"         // show DD.MM.YYYY with seconds
+                   views={['day','month','year','hours','minutes']}
+                   minutesStep={5} // allow selecting only 5-minute intervals
+                   ampm={false}
+                   slotProps={{
+                     textField: {
+                       size: 'small',
+                       variant: 'outlined',
+                       helperText: !minDate ? 'No measurements available' : "Select start date"
+                     }
+                   }}
+                 />
+
+                 {/* To picker */}
+                 <DateTimePicker
+                   label="To"
+                   value={dayTo ?? null}
+                   onChange={(v) => {
+                     // normalize picker output to a dayjs instance or null
+                     setDayTo(v ? dayjs(v) : null);
+                     setPage(0); // apply filter immediately
+                   }}
+                   minDateTime={minDate ?? undefined}
+                   maxDateTime={maxDate ?? undefined}
+                   disabled={!minDate || !maxDate}
+                   inputFormat="DD.MM.YYYY HH:mm:ss"
+                   views={['year','month','day','hours','minutes']}
+                   minutesStep={5}
+                   ampm={false}
+                   slotProps={{
+                     textField: {
+                       size: 'small',
+                       variant: 'outlined',
+                       helperText: !maxDate ? 'No measurements available' : "Select end date"
+                     }
+                   }}
+                 />
+              </LocalizationProvider>
+            </Paper>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClearFilters}>Wyczyść filtry</Button>
-          <Button onClick={() => setFilterDialogOpen(false)}>Zamknij</Button>
+        <DialogActions sx={{ margin: 1 }}>
+          <Button onClick={handleClearFilters} variant="outlined" startIcon={<DeleteIcon />}>Clear</Button>
         </DialogActions>
       </Dialog>
+
       {/* Okno dialogowe ze szczegółami pomiaru */}
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Szczegóły pomiaru</DialogTitle>
-        <DialogContent>
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        maxWidth="sm"
+        fullWidth
+        TransitionProps={{ onExited: () => setSelectedDetails(null) }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', padding: 1, paddingLeft: 2 }}>
+          <Box component="span">Details</Box>
+          <IconButton
+            aria-label="close"
+            onClick={handleClose}
+            sx={(theme) => ({ ml: 'auto' })}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <Divider />
+
+        <DialogContent sx={{ px: 2, py: 1 }}>
           {selectedDetails ? (
-            <List>
-              {Object.entries(selectedDetails).map(([key, value]) => (
-                <ListItem key={key}>
-                  <ListItemText
-                    primary={key}
-                    secondary={`${value.value} ${value.unit}`}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          ) : (
-            <Typography color="text.secondary">Brak szczegółowych danych.</Typography>
-          )}
-        </DialogContent>
+            <TableContainer
+              component={Paper}
+              sx={(theme) => ({
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: 1,
+                maxHeight: '60vh',
+                overflow: 'auto',
+              })}
+            >
+              <Table size="small" aria-label="details table" stickyHeader sx={{ borderCollapse: 'collapse', width: '100%' }}>
+                 <TableHead>
+                   <TableRow>
+                     <StyledTableCell>Parameter</StyledTableCell>
+                     <StyledTableCell align="right">Value</StyledTableCell>
+                   </TableRow>
+                 </TableHead>
+                 <TableBody>
+                   {Object.entries(selectedDetails).map(([key, value]) => (
+                     <StyledTableRow key={key}>
+                       <StyledTableCell component="th" scope="row">
+                         {labelForParameter(key)}
+                       </StyledTableCell>
+                       <StyledTableCell align="right">
+                         {value?.value ?? ''}{value?.unit ? ` ${value.unit}` : ''}
+                       </StyledTableCell>
+                     </StyledTableRow>
+                   ))}
+                 </TableBody>
+               </Table>
+             </TableContainer>
+           ) : (
+             <Typography color="text.secondary">Brak szczegółowych danych.</Typography>
+           )}
+         </DialogContent>
       </Dialog>
     </Box>
   );

@@ -1,12 +1,30 @@
 import { useState, useEffect } from 'react';
-import { HubConnectionBuilder } from '@microsoft/signalr';
-import { Typography, TextField, Button, Box, Grow, CircularProgress } from '@mui/material'
+import * as SignalR from '@microsoft/signalr';
+import { Typography, IconButton, TextField, Button, Box, Grow, CircularProgress } from '@mui/material'
 import cronstrue from 'cronstrue';
 import Device from '../components/Device/Device';
+import { styled } from '@mui/material/styles';
+import Paper from '@mui/material/Paper';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import Divider from '@mui/material/Divider';
+import DevicesIcon from '@mui/icons-material/Devices';
+import LinearProgress from '@mui/material/LinearProgress';
+
+const Item = styled(Paper)(({ theme }) => ({
+  backgroundColor: '#fff',
+  ...theme.typography.body2,
+  padding: theme.spacing(1),
+  textAlign: 'center',
+  color: (theme.vars ?? theme).palette.text.secondary,
+  ...theme.applyStyles('dark', {
+    backgroundColor: '#1A2027',
+  }),
+}));
+
 
 function Devices() {
   const [devices, setDevices] = useState([]);
-  const [loading, setLoading] = useState(false); // use this for refresh
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('');
 
@@ -23,7 +41,6 @@ function Devices() {
     });
   };
 
-  // Pobieranie urządzeń
   const fetchDevices = () => {
     setLoading(true);
     setError(null);
@@ -37,7 +54,7 @@ function Devices() {
         setTimeout(() => {
           setDevices(data);
           setLoading(false);
-        }, 1200); // spinner stays for at least 1.2s
+        }, 1200);
       })
       .catch(err => {
         setLoading(false);
@@ -46,23 +63,24 @@ function Devices() {
   };
 
   useEffect(() => {
-    fetchDevices(); // fetch on page load
+    fetchDevices();
 
-    const connection = new HubConnectionBuilder()
+    const connection = new SignalR.HubConnectionBuilder()
       .withUrl('https://localhost:6061/devicehub')
+      .configureLogging(SignalR.LogLevel.None)
       .withAutomaticReconnect()
       .build();
 
     connection.start()
       .then(() => {
         connection.on('DeviceCreated', () => {
-          fetchDevices(); // refresh devices when added
+          fetchDevices();
         });
         connection.on('DeviceDeleted', () => {
-          fetchDevices(); // refresh devices when deleted
+          fetchDevices();
         });
         connection.on('DeviceUpdated', (deviceData) => {
-          // You can use RefreshDevice_WebSocket_Handler(deviceData) or fetchDevices();
+          console.log('DEVICE UPDATED');
         });
       })
       .catch(() => {});
@@ -72,7 +90,6 @@ function Devices() {
     };
   }, []);
 
-  // Dodaj tłumaczenie CRON do każdego urządzenia
   const devicesWithCronText = devices.map(device => ({
     ...device,
     cronText: device.timestampConfiguration?.cron
@@ -86,7 +103,6 @@ function Devices() {
       : ''
   }));
 
-  // Filtrowanie urządzeń po właściwościach + tłumaczony CRON
   const filteredDevices = devicesWithCronText.filter(device =>
     filter === '' ||
     (device.name && device.name.toLowerCase().includes(filter.toLowerCase())) ||
@@ -97,62 +113,93 @@ function Devices() {
   );
 
   return (
-    <Box sx={{ maxWidth: 1200, margin: '0 auto', padding: 2, position: 'relative' }}>
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', marginBottom: 3 }}>
+    <Box sx={{ 
+      width: '100%', 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      overflow: 'hidden'
+    }}>
+      <Box sx={{alignItems: 'center', justifyContent:'center', display: 'flex', gap: 1, mb: 3, mt: 1 }}>
         <TextField
-          label="Filtruj urządzenia (nazwa, numer, lokalizacja, status)"
+          label="Search"
           variant="outlined"
           value={filter}
+          size="small"
           onChange={e => setFilter(e.target.value)}
-          sx={{ flex: 1 }}
+          sx={{ width: '33%' }}
         />
-        <Button variant="contained" onClick={fetchDevices}>
-          Odśwież
-        </Button>
+            <IconButton onClick={fetchDevices} sx={{ ml: 1 }} >
+                <RefreshIcon />
+            </IconButton>
       </Box>
-      {loading && (
+
+      <Divider />
+
+      {loading ? (
         <Box
           sx={{
-            position: 'absolute',
-            top: 60, // below filter bar
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 20,
-            bgcolor: 'rgba(255,255,255,0.6)',
+            height: '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
           }}
         >
-          <CircularProgress size={64} />
+          <Box sx={{ width: '33%' }}>
+            <Typography variant="h6" align="center" gutterBottom>
+              Loading devices...
+            </Typography>
+            <LinearProgress />
+          </Box>
         </Box>
-      )}
-      {error && <div>Błąd: {error}</div>}
+      ) : (
       <Box
         sx={{
-          width: '100%',
-          height: 2 * 420 + 3 * 32,
-          maxWidth: 1400,
-          margin: '0 auto',
-          background: '#f5f7fa',
-          borderRadius: 2,
-          boxShadow: 2,
-          padding: 3,
-          overflowY: 'auto',
+          height: '100%',
+          mt: 2,
           overflowX: 'hidden',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          gridAutoRows: '420px',
-          gap: 6
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          alignItems: 'left',
+          alignContent: 'left',
+          p: 2,
         }}
       >
-        {filteredDevices.length === 0 && !loading && (
-          <Box sx={{ gridColumn: '1 / -1', textAlign: 'center', color: '#888', fontSize: 22, py: 8 }}>
-            Brak urządzeń do wyświetlenia.
+        {filteredDevices.length === 0 && !loading ? (
+        <Box
+          sx={{
+            width: '33%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+          }}
+        >
+          <Box
+            sx={{
+              backgroundColor: "#303235",
+              color: "white",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 100,
+              height: 100,
+              mb: 2,
+            }}
+          >
+            <DevicesIcon sx={{ fontSize: 50 }} />
           </Box>
-        )}
-        {filteredDevices.map(device => (
+
+          <Typography variant="h6" gutterBottom>
+            No devices found.
+          </Typography>
+        </Box>
+        ) : 
+        filteredDevices.map(device => (
           <Grow
             key={device.id}
             in={true}
@@ -175,6 +222,7 @@ function Devices() {
           </Grow>
         ))}
       </Box>
+      )}
     </Box>
   );
 }

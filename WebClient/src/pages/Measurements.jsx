@@ -6,6 +6,7 @@ import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
+import Divider from '@mui/material/Divider';
 import TableHead from '@mui/material/TableHead';
 import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
@@ -27,6 +28,14 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { MobileDateTimePicker } from '@mui/x-date-pickers/MobileDateTimePicker';
+import InputAdornment from '@mui/material/InputAdornment';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import ViewWeekOutlinedIcon from '@mui/icons-material/ViewWeekOutlined';
+import Tooltip from '@mui/material/Tooltip';
+import Switch from '@mui/material/Switch';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CheckOutlinedIcon from '@mui/icons-material/CheckOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 
 dayjs.extend(utc);
 
@@ -38,23 +47,23 @@ const columns = [
   { id: 'location', label: 'Location', minWidth: 140 },
 
   // All measurement types as columns (these will be toggleable)
-  { id: 'temperature', label: 'Temperature', minWidth: 110 },
-  { id: 'humidity', label: 'Humidity', minWidth: 110 },
-  { id: 'cO2', label: 'CO₂', minWidth: 100 },
-  { id: 'voc', label: 'VOC', minWidth: 100 },
-  { id: 'particulateMatter1', label: 'PM1', minWidth: 100 },
-  { id: 'particulateMatter2v5', label: 'PM2.5', minWidth: 100 },
-  { id: 'particulateMatter10', label: 'PM10', minWidth: 100 },
+  { id: 'temperature', label: 'Temperature', minWidth: 120 },
+  { id: 'humidity', label: 'Humidity', minWidth: 120 },
+  { id: 'cO2', label: 'Carbon Dioxide (CO₂)', minWidth: 220 },
+  { id: 'voc', label: 'Volatile Organic Compounds', minWidth: 250 },
+  { id: 'particulateMatter1', label: 'Particulate Matter 1µm', minWidth: 220 },
+  { id: 'particulateMatter2v5', label: 'Particulate Matter 2.5µm', minWidth: 220 },
+  { id: 'particulateMatter10', label: 'Particulate Matter 10µm', minWidth: 220 },
   { id: 'formaldehyde', label: 'Formaldehyde', minWidth: 120 },
-  { id: 'co', label: 'CO', minWidth: 80 },
-  { id: 'o3', label: 'O₃', minWidth: 80 },
-  { id: 'ammonia', label: 'Ammonia', minWidth: 100 },
-  { id: 'airflow', label: 'Airflow', minWidth: 100 },
-  { id: 'airIonizationLevel', label: 'Air Ionization', minWidth: 130 },
-  { id: 'o2', label: 'O₂', minWidth: 80 },
-  { id: 'radon', label: 'Radon', minWidth: 100 },
-  { id: 'illuminance', label: 'Illuminance', minWidth: 100 },
-  { id: 'soundLevel', label: 'Sound Level', minWidth: 100 }
+  { id: 'co', label: 'Carbon Minoxide (CO)', minWidth: 220 },
+  { id: 'o3', label: 'Ozone (O₃)', minWidth: 150 },
+  { id: 'ammonia', label: 'Ammonia', minWidth: 120 },
+  { id: 'airflow', label: 'Airflow', minWidth: 120 },
+  { id: 'airIonizationLevel', label: 'Air Ionization', minWidth: 150 },
+  { id: 'o2', label: 'Oxygen (O₂)', minWidth: 150 },
+  { id: 'radon', label: 'Radon', minWidth: 120 },
+  { id: 'illuminance', label: 'Illuminance', minWidth: 120 },
+  { id: 'soundLevel', label: 'Sound Level', minWidth: 150 }
 ];
 
 function formatMeasure(m) {
@@ -149,18 +158,18 @@ export default function Measurements() {
       }
 
       if(filterDayTo){
-        const filterDateToISO = filterDayTo.utc().toISOString();
+        const filterDateToISO = filterDayTo.toISOString();
         params.append('DateTo', filterDateToISO);
       }
 
       if(filterDayFrom){
-        const filterDatyFromISO = filterDayFrom.utc().toISOString();
+        const filterDatyFromISO = filterDayFrom.toISOString();
         params.append('DateFrom', filterDatyFromISO);
       }
 
       if (dateSortOrder) params.append('SortOrder', dateSortOrder);
 
-      //console.log(params.toString()); 
+      console.log(`[FETCH MEASUREMENTS] - ${params.toString()}`);
 
       const url = `https://localhost:6063/measurements/query?${params.toString()}`;
       const resp = await fetch(url);
@@ -195,30 +204,33 @@ export default function Measurements() {
       }));
       setMeasurements(mapped);
       setTotalCount(json.totalCount ?? json.total ?? mapped.length);
-    } catch (e) {
-      console.error('fetchMeasurements error', e);
+    } 
+    catch (e) 
+    {
+      console.log(`[FETCH MEASUREMENTS] - ${e}`);
       setMeasurements([]);
       setTotalCount(0);
-    } finally {
+    } 
+    finally 
+    {
       setLoading(false);
     }
   }, [filterDayFrom, filterDayTo, rowsPerPage, appliedFilters, dateSortOrder, searchText]);
 
-  // fetch min/max available measurement dates from backend and set pickers + limits
-  const fetchAvailableDateRange = React.useCallback(async () => {
+  const FetchMeasurementsInfo = React.useCallback(async () => {
     setDateRangeLoading(true);
     try {
       const resp = await fetch('https://localhost:6063/measurements/dates');
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const json = await resp.json();
-      // backend returns ISO-like strings; use dayjs to parse and set UTC to be consistent with existing code
+      
+      console.log(`[FETCH MEASUREMENTS INFO] - ${JSON.stringify(json, null, 2)}`);
+
       if (json.minDate && dayjs(json.minDate).isValid()) {
         const min = dayjs(json.minDate).utc();
         setDateRangeMin(min);
-        // if user pick value not set yet, initialize from min
         setFilterDayFrom(prev => {
           const newValue = prev ? prev : min;
-          //console.log("Setting filterDayFrom to:", newValue);
           return newValue;
         });
       }
@@ -227,27 +239,27 @@ export default function Measurements() {
         setDateRangeMax(max);
         setFilterDayTo(prev => {
           const newValue = prev ? prev : max;
-          //console.log("Setting filterDayTo to:", newValue);
           return newValue;
         });
       }
 
-    } catch (err) {
-      console.error('fetchAvailableDateRange error', err);
-    } finally {
+    } 
+    catch (err) 
+    {
+      console.log(`[FETCH MEASUREMENTS INFO] - ${err}`);
+    } 
+    finally 
+    {
       setDateRangeLoading(false);
     }
   }, []);
 
   React.useEffect(() => {
-    // get date bounds once on mount
-    fetchAvailableDateRange();
-  }, [fetchAvailableDateRange]);
+    FetchMeasurementsInfo();
+  }, [FetchMeasurementsInfo]);
 
   React.useEffect(() => {
-    // initial load
     fetchMeasurements(1, rowsPerPage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChangePage = (event, newPage) => {
@@ -290,6 +302,8 @@ export default function Measurements() {
     setFilterDayTo(null);
     setDateSortOrder('desc');
     setPage(0);
+
+    setTimeout(() => fetchMeasurements(1, rowsPerPage), 0);
   };
 
   // columns to actually render
@@ -299,28 +313,40 @@ export default function Measurements() {
   const selectedMeasurementCount = measurementIds.filter(id => visibleColumnIds.includes(id)).length;
 
   return (
-    <Box sx={{ width: '100%', mt: 3 }}>
-      {/* New: compact filter controls above the table */}
-      <Paper sx={{ mb: 2, p: 2 }}>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+    <Box sx={{ 
+      width: '100%', 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      overflow: 'hidden'
+    }}>
+      {/* Filter controls at top */}
+      <Paper sx={{ mb: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, mt: 1, mb: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+
           <TextField
-            label="Szukaj (device number / name / location)"
-            variant="standard"
-            size="small"
+            label="Search"
+            variant="outlined"
+            size = 'small'
             id="measurement-search-input"
             defaultValue={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             sx={{ minWidth: 300 }}
-          />
+            slotProps={{
+            }}/>
 
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             {/* From picker (disabled while date range loads). min/max prevent selecting outside backend range */}
-            <MobileDateTimePicker
-              label="Od dnia"
+            <DateTimePicker
+              label="From"
+              variant="outlined"
+              size="medium"
+              slotProps={{
+              textField : { size: 'small', variant: 'outlined' }, }}
               id="measurement-dayfrom-picker"
               value={filterDayFrom}
               onChange={(v) => setFilterDayFrom(v)}
-              slotProps={{ textField: { size: 'small', variant: 'standard' } }}
+              //slotProps={{ textField: { size: 'small', variant: 'standard' } }}
               disabled={dateRangeLoading}
               {...(dateRangeMin ? { minDateTime: dateRangeMin } : {})}
               {...(dateRangeMax ? { maxDateTime: dateRangeMax } : {})}
@@ -329,12 +355,14 @@ export default function Measurements() {
             />
 
             {/* To picker (disabled while date range loads). min/max prevent selecting outside backend range */}
-            <MobileDateTimePicker
-              label="Do dnia"
+            <DateTimePicker
+              label="To"
               id="measurement-dayto-picker"
+              slotProps={{
+              textField: { size: 'small', variant: 'outlined' }, }}
               value={filterDayTo}
               onChange={(v) => setFilterDayTo(v)}
-              slotProps={{ textField: { size: 'small', variant: 'standard' } }}
+              //slotProps={{ textField: { size: 'small', variant: 'standard' } }}
               disabled={dateRangeLoading}
               {...(dateRangeMin ? { minDateTime: dateRangeMin } : {})}
               {...(dateRangeMax ? { maxDateTime: dateRangeMax } : {})}
@@ -344,12 +372,13 @@ export default function Measurements() {
           </LocalizationProvider>
 
           {/* Columns chooser button */}
-          <IconButton onClick={handleOpenColsMenu} sx={{ ml: 1 }}>
-            <Badge badgeContent={selectedMeasurementCount} color="primary">
-              <FilterListIcon />
-            </Badge>
-          </IconButton>
-
+          <Tooltip title="Columns">
+            <IconButton onClick={handleOpenColsMenu} sx={{ ml: 1 }}>
+              <Badge badgeContent={selectedMeasurementCount} color="primary">
+                <ViewWeekOutlinedIcon />
+              </Badge>
+            </IconButton>
+          </Tooltip>
           <Menu
             anchorEl={anchorColsEl}
             open={colsMenuOpen}
@@ -364,84 +393,127 @@ export default function Measurements() {
               }
             }}
           >
-            {/* scrollable list area */}
-            <Box sx={{ flex: 1, overflow: 'auto' }}>
-              {measurementColumns.map(col => (
-                <MenuItem key={col.id} onClick={() => toggleColumn(col.id)}>
-                  <Checkbox checked={visibleColumnIds.includes(col.id)} size="small" />
-                  <ListItemText primary={col.label} />
-                </MenuItem>
-              ))}
-            </Box>
-
-            {/* footer with actions fixed to bottom */}
-            <Box sx={{ borderTop: '1px solid rgba(0,0,0,0.12)', p: 1, display: 'flex', gap: 1, justifyContent: 'space-between', alignItems: 'center' }}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button size="small" onClick={selectAllMeasurements} variant="outlined">Zaznacz wszystko</Button>
-                <Button size="small" onClick={clearMeasurementSelection} variant="outlined">Wyczyść zaznaczenie</Button>
+            <Paper
+              variant="outlined"
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                height: 400, // or any fixed height — required for flex/scroll layout
+                overflow: 'hidden', // prevent Paper itself from scrolling
+              }}
+            >
+              <Box sx={{ p: 1, paddingLeft: 1.5, display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+                <Typography width="100%" fontWeight='bold' variant="subtitle1">Columns</Typography>
+                <IconButton onClick={handleCloseColsMenu} sx={{ ml: 1 }} >
+                    <CloseIcon />
+                </IconButton>
               </Box>
-              <Button size="small" variant="contained" onClick={handleCloseColsMenu}>Zamknij</Button>
-            </Box>
+              
+              <Divider/>
+
+              {/* scrollable list */}
+              <Box
+                sx={{
+                  flex: 1,
+                  overflowY: 'auto', // only the list scrolls
+                  pr: 1, // optional: prevent scrollbar overlap
+                }}
+              >
+                {measurementColumns.map(col => (
+                  <MenuItem key={col.id} onClick={() => toggleColumn(col.id)} disableRipple>
+                    <Switch checked={visibleColumnIds.includes(col.id)} size="small"/>
+                    <ListItemText primary={col.label} />
+                  </MenuItem>
+                ))}
+              </Box>
+
+              {/* footer fixed to bottom */}
+              <Box
+                sx={{
+                  p: 1,
+                  display: 'flex',
+                  gap: 1,
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  borderTop: '1px solid rgba(255,255,255,0.1)', // subtle separator
+                  flexShrink: 0, // prevent footer from shrinking or scrolling
+                  backgroundColor: '#10151b', // keep it visually separate if dark theme
+                }}
+              >
+                <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                  <Button size="small" onClick={selectAllMeasurements} variant="text">Select</Button>
+                  <Button size="small" onClick={clearMeasurementSelection} variant="text">Unselect</Button>
+                </Box>
+              </Box>
+            </Paper>
+
           </Menu>
 
-          {/* Sort chooser button (otwiera okienko podobne do wyboru kolumn) */}
-          <IconButton onClick={handleOpenSortMenu} sx={{ ml: 1 }}>
-            <SortIcon />
-          </IconButton>
-
+          {/* Sorting */}
+          <Tooltip title="Sorting">
+            <IconButton onClick={handleOpenSortMenu} sx={{ ml: 1 }}>
+              <SortIcon />
+            </IconButton>
+          </Tooltip>
           <Menu
             anchorEl={anchorSortEl}
             open={sortMenuOpen}
             onClose={handleCloseSortMenu}
-            MenuListProps={{ dense: true }}
-            PaperProps={{
-              style: {
-                width: 280,
-                height: 180,
-                display: 'flex',
-                flexDirection: 'column'
-              }
-            }}
           >
-            <Box sx={{ p: 1 }}>
-              <Typography variant="subtitle1">Sortowanie po dacie</Typography>
-              <Typography variant="caption" color="text.secondary">Wybierz sposób sortowania</Typography>
-            </Box>
+            <Paper
+              variant="outlined"
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              <Box sx={{ p: 1, paddingLeft: 1.5, display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+                <Typography width="100%" fontWeight='bold' variant="subtitle1">Sorting (Date)</Typography>
+                <IconButton onClick={handleCloseSortMenu} sx={{ ml: 1 }} >
+                    <CloseIcon />
+                </IconButton>
+              </Box>
 
-            <Box sx={{ flex: 1, overflow: 'auto' }}>
-              <MenuItem
-                onClick={() => { setDateSortOrder('asc'); handleCloseSortMenu(); }}
-                selected={dateSortOrder === 'asc'}
-              >
-                <Radio checked={dateSortOrder === 'asc'} size="small" />
-                <ListItemText primary="Rosnąco (najstarsze najpierw)" />
-              </MenuItem>
+              <Divider/>
 
-              <MenuItem
-                onClick={() => { setDateSortOrder('desc'); handleCloseSortMenu(); }}
-                selected={dateSortOrder === 'desc'}
-              >
-                <Radio checked={dateSortOrder === 'desc'} size="small" />
-                <ListItemText primary="Malejąco (najnowsze najpierw)" />
-              </MenuItem>
-            </Box>
+              {/* List of options for sorting */}
+              <Box sx={{ flex: 1, overflow: 'auto' }}>
+                <MenuItem
+                  onClick={() => { setDateSortOrder('asc'); }}
+                  selected={dateSortOrder === 'asc'}
+                  >
+                  <Switch checked={dateSortOrder === 'asc'} size="small" />
+                  <ListItemText primary="Ascending (oldest first)" />
+                </MenuItem>
 
-            <Box sx={{ borderTop: '1px solid rgba(0,0,0,0.12)', p: 1, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button size="small" variant="contained" onClick={handleCloseSortMenu}>Zamknij</Button>
-            </Box>
+                <MenuItem
+                  onClick={() => { setDateSortOrder('desc'); }}
+                  selected={dateSortOrder === 'desc'}
+                  >
+                  <Switch checked={dateSortOrder === 'desc'} size="small" />
+                  <ListItemText primary="Descending (newest first)" />
+                </MenuItem>
+              </Box>
+            </Paper>
           </Menu>
 
-          <Button variant="contained" onClick={handleApplyFilters} sx={{ ml: 'auto' }} disabled={loading}>
-            Zastosuj filtry
-          </Button>
-          <Button variant="outlined" onClick={handleClearAll} sx={{ ml: 1 }} disabled={loading}>
-            Wyczyść filtry i sortowanie
-          </Button>
+          <Button variant="outlined" onClick={handleApplyFilters} sx={{ ml: 'auto' }} disabled={loading} startIcon={<CheckOutlinedIcon />}>Apply</Button>
+          <Button variant="outlined" color='error' onClick={handleClearAll} sx={{ ml: 1 }} disabled={loading} startIcon={<DeleteIcon />}>Clear</Button>
         </Box>
       </Paper>
 
-      <Paper sx={{ width: '100%', overflow: 'hidden', position: 'relative' }}>
-        {/* loading overlay now covers table + pagination (blocks interactions during load) */}
+      <Divider/>
+
+      {/* Main table area - takes remaining space */}
+      <Paper sx={{ 
+        flexGrow: 1, 
+        display: 'flex', 
+        flexDirection: 'column',
+        overflow: 'hidden',
+        position: 'relative'
+      }}>
+        {/* loading overlay */}
         {loading && (
           <Box
             sx={{
@@ -451,21 +523,28 @@ export default function Measurements() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: 'rgba(255,255,255,0.6)'
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              backdropFilter: 'blur(2px)',
+              WebkitBackdropFilter: 'blur(2px)',
             }}
           >
-            <CircularProgress />
+            <CircularProgress size="8rem" />
           </Box>
         )}
 
-        <TableContainer sx={{ maxHeight: 640 }}>
+        {/* Table container - grows to fill available space */}
+        <TableContainer sx={{ 
+          flexGrow: 1, 
+          overflow: 'auto',
+          minHeight: 0 
+        }}>
           <Table stickyHeader aria-label="measurements table">
             <TableHead>
               <TableRow>
                 <TableCell style={{ minWidth: 60, fontWeight: 'bold' }}>Index</TableCell>
                 {columnsToShow.map((column) => (
                   <TableCell key={column.id} style={{ minWidth: column.minWidth, fontWeight: 'bold' }}>
-                    <TableSortLabel>{column.label}</TableSortLabel>
+                    {column.label}
                   </TableCell>
                 ))}
               </TableRow>
@@ -475,7 +554,7 @@ export default function Measurements() {
               {measurements.length === 0 && !loading ? (
                 <TableRow>
                   <TableCell colSpan={columnsToShow.length + 1} align="center" sx={{ py: 6, color: '#888' }}>
-                    Brak pomiarów do wyświetlenia.
+                    No measurements to display.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -497,15 +576,21 @@ export default function Measurements() {
           </Table>
         </TableContainer>
 
-        <TablePagination
-          rowsPerPageOptions={[10, 25, 50, 100]}
-          component="div"
-          count={totalCount}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
+       <Divider />
+
+       {/* Pagination fixed at bottom inside the Paper */}
+       <TablePagination
+         rowsPerPageOptions={[10, 25, 50, 100]}
+         component="div"
+         count={totalCount}
+         rowsPerPage={rowsPerPage}
+         page={page}
+         onPageChange={handleChangePage}
+         onRowsPerPageChange={handleChangeRowsPerPage}
+         sx={{ 
+           flexShrink: 0,  // prevent pagination from shrinking
+         }}
+       />
       </Paper>
     </Box>
   );
