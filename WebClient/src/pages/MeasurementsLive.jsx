@@ -31,7 +31,6 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import DeleteIcon from '@mui/icons-material/Delete';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
-dayjs.extend(customParseFormat);
 import Tooltip from '@mui/material/Tooltip';
 import Divider from '@mui/material/Divider';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
@@ -40,6 +39,7 @@ import { styled } from '@mui/material/styles';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { alpha } from '@mui/material/styles';
 import Collapse from '@mui/material/Collapse';
+dayjs.extend(customParseFormat);
 
 const columns = [
   { id: 'day', label: 'Day', minWidth: 50 },

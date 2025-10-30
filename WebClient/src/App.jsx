@@ -38,10 +38,12 @@ const theme = createTheme({
     mode: 'dark',
     background: { default: '#0b0f14', paper: '#10151b' },
     primary: {
-      main: '#2986FF'
+      main: '#2986FF',
+      light: '#4DA6E3'
     },
     customred: {
-      main: '#D24F5E'
+      main: '#D24F5E',
+      dark: '#D1334C'
     },
     customgreen: {
       main: '#00A58C',
@@ -50,8 +52,24 @@ const theme = createTheme({
     customorange: {
       main: '#F0A242'
     },
+    customyellow:{
+      main: '#F3E871'
+    },
+    custompalette:{
+      powderblue: '#ADBECB',
+      airsuperiorityblue: '#7794AB',
+      royalblue: '#1D63ED',
+      azure: '#2986FF',
+      maize: '#F3E871',
+      teagreen: '#C6EBBE',
+      persiangreen: '#00A58C',
+      indianred: '#D24F5E',
+      rustyred: '#D1334C'
+    },
     customgray: {
-      light: '#4E6A81'
+      lightest: '#303235',
+      light: '#4E6A81',
+      dark: '#0b0f14'
     },
   },
   components: {
@@ -205,13 +223,24 @@ const theme = createTheme({
       },
     },
     MuiButton:{
+      defaultProps: {
+        disableRipple: true,
+      },
       styleOverrides:{
-        root:{
-          //disableRipple: true,
+        root: ({ theme }) => ({
+          backgroundColor: theme.palette.custompalette.royalblue,
           textTransform: 'none',
-          //fontSize: 15,
-          width: 90
-        }
+          width: 90,
+          color: 'white',
+          transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
+          '&:hover': {
+            backgroundColor: alpha(theme.palette.custompalette.azure, 0.90),
+            //color: theme.palette.custompalette.royalblue,
+          },
+          '&:active': {
+            backgroundColor: alpha(theme.palette.custompalette.azure, 1),
+          },
+        }),
       },
     },
     MuiMenuItem:{
@@ -223,6 +252,13 @@ const theme = createTheme({
       defaultProps: {
         //disableRipple: true,
       },
+    },
+    MuiTypography:{
+      styleOverrides:{
+        root:{
+          userSelect: 'none',
+        }
+      }
     },
     MuiTab:{
       styleOverrides:{
@@ -358,11 +394,12 @@ function App() {
 
        {/* main content: fills available space between top toolbar and footer */}
        <Box sx={{ 
-        margin: 2,
+        //margin: 2,
+        padding: 0,
         flexGrow: 1, 
         overflow: 'auto',
-        minHeight: 0,
-        maxHeight: 'calc(100vh - 64px - 2*16px - 25px)' // subtract AppBar height, margins, and footer height
+        //minHeight: 0,
+        //maxHeight: 'calc(100vh - 64px - 2*16px - 25px)' // subtract AppBar height, margins, and footer height
       }}>
          <Routes>
            <Route path="/" element={<div>Home (add your component)</div>} />
@@ -375,7 +412,11 @@ function App() {
        </Box>
 
       {/* fixed footer always visible at bottom */}
-      <Box sx={{ backgroundColor: '#080B0E' }}>
+      <Box sx={{ 
+          margin: 0,
+          padding: 0,
+          backgroundColor: '#080B0E' }}
+        >
         <Typography sx={{ color: "white" }}>
           This is going to be footer in future - x Devices running Context menu - shutdown / start /
         </Typography>
