@@ -14,6 +14,10 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
+import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined';
+import CloudDoneOutlinedIcon from '@mui/icons-material/CloudDoneOutlined';
+import QueryStatsOutlinedIcon from '@mui/icons-material/QueryStatsOutlined';
+import CloudOutlinedIcon from '@mui/icons-material/CloudOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
 import * as React from 'react';
 import Drawer from '@mui/material/Drawer';
@@ -37,10 +41,6 @@ const theme = createTheme({
   palette: {
     mode: 'dark',
     background: { default: '#0b0f14', paper: '#10151b' },
-    primary: {
-      main: '#2986FF',
-      light: '#4DA6E3'
-    },
     customred: {
       main: '#D24F5E',
       dark: '#D1334C'
@@ -56,9 +56,14 @@ const theme = createTheme({
       main: '#F3E871'
     },
     custompalette:{
+      night: '#080B0E',
+      richblack: '#10151B',
+      jet: '#303235',
+      paynesgray: '#4E6A81',
       powderblue: '#ADBECB',
       airsuperiorityblue: '#7794AB',
       royalblue: '#1D63ED',
+      charcoal: '#2D404E',
       azure: '#2986FF',
       maize: '#F3E871',
       teagreen: '#C6EBBE',
@@ -70,6 +75,10 @@ const theme = createTheme({
       lightest: '#303235',
       light: '#4E6A81',
       dark: '#0b0f14'
+    },
+    primary: {
+      main: '#1D63ED',
+      light: '#2986FF'
     },
   },
   components: {
@@ -134,14 +143,15 @@ const theme = createTheme({
         TransitionComponent: Zoom,
       },
       styleOverrides: {
-        tooltip: {
-          // backgroundColor: '#10151b',
-          // color: '#fff',
-          fontSize: '0.875rem',
-        },
-        arrow: {
-          //color: '#10151b',
-        },
+        tooltip: ({ theme }) => ({
+          backgroundColor: theme.palette.custompalette.charcoal,
+          color: '#fff',
+          fontSize: '0.8rem',
+          borderRadius: '6px',
+        }),
+        arrow: ({ theme }) => ({
+          color: theme.palette.custompalette.charcoal,
+        }),
       },
     },
     MuiTable: {
@@ -257,6 +267,46 @@ const theme = createTheme({
       styleOverrides:{
         root:{
           userSelect: 'none',
+          fontSize: '0.875rem',
+        },
+        h1: {
+          fontSize: '2.5rem',
+        },
+        h2: {
+          fontSize: '2rem',
+        },
+        h3: {
+          fontSize: '1.75rem',
+        },
+        h4: {
+          fontSize: '1.5rem',
+        },
+        h5: {
+          fontSize: '1.25rem',
+        },
+        h6: {
+          fontSize: '1.125rem',
+        },
+        body1: {
+          fontSize: '1rem',
+        },
+        body2: {
+          fontSize: '0.875rem',
+        },
+        caption: {
+          fontSize: '0.75rem',
+        },
+        subtitle1: {
+          fontSize: '1rem',
+        },
+        subtitle2: {
+          fontSize: '0.875rem',
+        },
+        button: {
+          fontSize: '0.875rem',
+        },
+        overline: {
+          fontSize: '0.75rem',
         }
       }
     },
@@ -317,23 +367,35 @@ function App() {
           </ListItemButton>
         </ListItem>
 
-        {/* Measurements Live */}
-        <ListItem disablePadding>
-          <ListItemButton component={Link} to="/measurementslive">
-            <ListItemIcon>
-              <InsightsIcon />
-            </ListItemIcon>
-            <ListItemText primary="Live Measurements" />
-          </ListItemButton>
-        </ListItem>
+        <Divider />
 
         {/* Measurements */}
         <ListItem disablePadding>
           <ListItemButton component={Link} to="/measurements">
             <ListItemIcon>
-              <EqualizerIcon />
+              <CloudOutlinedIcon />
             </ListItemIcon>
             <ListItemText primary="Measurements" />
+          </ListItemButton>
+        </ListItem>
+
+        {/* Measurements Live */}
+        <ListItem disablePadding>
+          <ListItemButton component={Link} to="/measurementslive">
+            <ListItemIcon>
+              <CloudSyncOutlinedIcon />
+            </ListItemIcon>
+            <ListItemText primary="Live Measurements" />
+          </ListItemButton>
+        </ListItem>
+
+        {/* Measurements Charts*/}
+        <ListItem disablePadding>
+          <ListItemButton component={Link} to="/measurementslive">
+            <ListItemIcon>
+              <QueryStatsOutlinedIcon />
+            </ListItemIcon>
+            <ListItemText primary="Measurement Charts" />
           </ListItemButton>
         </ListItem>
 

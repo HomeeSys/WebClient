@@ -1,108 +1,106 @@
 import * as React from 'react';
+
+// DayJS
 import dayjs from 'dayjs';
 import utc from "dayjs/plugin/utc";
-import Paper from '@mui/material/Paper';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import Divider from '@mui/material/Divider';
-import TableHead from '@mui/material/TableHead';
-import TablePagination from '@mui/material/TablePagination';
-import TableRow from '@mui/material/TableRow';
-import TableSortLabel from '@mui/material/TableSortLabel';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import SortIcon from '@mui/icons-material/Sort';
-import Badge from '@mui/material/Badge';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import Checkbox from '@mui/material/Checkbox';
-import Radio from '@mui/material/Radio';
-import ListItemText from '@mui/material/ListItemText';
-import CircularProgress from '@mui/material/CircularProgress';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+
+// Material UI
+import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, Divider, Snackbar, Fade, LinearProgress, TableRow, Box, Typography, IconButton, Badge, TextField, Button, Menu, MenuItem, ListItemText, Tooltip, Switch, Autocomplete } from '@mui/material';
+import { alpha } from '@mui/material/styles';
+
+// Date Pickers
+import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { MobileDateTimePicker } from '@mui/x-date-pickers/MobileDateTimePicker';
-import InputAdornment from '@mui/material/InputAdornment';
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
-import ViewWeekOutlinedIcon from '@mui/icons-material/ViewWeekOutlined';
-import Tooltip from '@mui/material/Tooltip';
-import Switch from '@mui/material/Switch';
-import DeleteIcon from '@mui/icons-material/Delete';
-import CheckOutlinedIcon from '@mui/icons-material/CheckOutlined';
-import CloseIcon from '@mui/icons-material/Close';
+
+// SignalR
+import * as SignalR from '@microsoft/signalr';
+
+//  Icons
+import { FilterList as FilterListIcon, WifiOffOutlined as WifiOffOutlinedIcon, Campaign as CampaignIcon, CloudOutlined as CloudOutlinedIcon, DeleteSweepOutlined as DeleteSweepOutlinedIcon, CachedOutlined as CachedOutlinedIcon, ViewWeekOutlined as ViewWeekOutlinedIcon, CloudOffOutlined as CloudOffOutlinedIcon, Close as CloseIcon, Sort as SortIcon } from '@mui/icons-material';
+import CopyAllIcon from '@mui/icons-material/CopyAll';
+//  Components
+import InfoLabel from '../components/InfoLabel';
+import LoadingLabel from '../components/LoadingLabel';
 
 dayjs.extend(utc);
 
 const columns = [
-  { id: 'day', label: 'Day', minWidth: 110 },
-  { id: 'hour', label: 'Hour', minWidth: 80 },
-  { id: 'deviceNumber', label: 'Device Number', minWidth: 300 },
-  { id: 'deviceName', label: 'Device Name', minWidth: 140 },
-  { id: 'location', label: 'Location', minWidth: 140 },
+  { id: 'index', label: 'Index', minWidth: 60 },
+  { id: 'date', label: 'Date', minWidth: 250 },
+  { id: 'deviceNumber', label: 'Device Number', minWidth: 350 },
+  { id: 'deviceName', label: 'Device Name', minWidth: 150 },
+  { id: 'locationName', label: 'Location', minWidth: 150 },
 
-  // All measurement types as columns (these will be toggleable)
-  { id: 'temperature', label: 'Temperature', minWidth: 120 },
-  { id: 'humidity', label: 'Humidity', minWidth: 120 },
-  { id: 'cO2', label: 'Carbon Dioxide (CO₂)', minWidth: 220 },
-  { id: 'voc', label: 'Volatile Organic Compounds', minWidth: 250 },
-  { id: 'particulateMatter1', label: 'Particulate Matter 1µm', minWidth: 220 },
-  { id: 'particulateMatter2v5', label: 'Particulate Matter 2.5µm', minWidth: 220 },
-  { id: 'particulateMatter10', label: 'Particulate Matter 10µm', minWidth: 220 },
-  { id: 'formaldehyde', label: 'Formaldehyde', minWidth: 120 },
-  { id: 'co', label: 'Carbon Minoxide (CO)', minWidth: 220 },
-  { id: 'o3', label: 'Ozone (O₃)', minWidth: 150 },
-  { id: 'ammonia', label: 'Ammonia', minWidth: 120 },
-  { id: 'airflow', label: 'Airflow', minWidth: 120 },
-  { id: 'airIonizationLevel', label: 'Air Ionization', minWidth: 150 },
-  { id: 'o2', label: 'Oxygen (O₂)', minWidth: 150 },
-  { id: 'radon', label: 'Radon', minWidth: 120 },
-  { id: 'illuminance', label: 'Illuminance', minWidth: 120 },
-  { id: 'soundLevel', label: 'Sound Level', minWidth: 150 }
+  { id: 'temperature', label: 'Air Temperature (T)', minWidth: 300 },
+  { id: 'humidity', label: 'Relative Humidity (RH)', minWidth: 300 },
+  { id: 'carbonDioxide', label: 'Carbon Dioxide (CO₂)', minWidth: 300 },
+  { id: 'volatileOrganicCompounds', label: 'Volatile Organic Compounds (VOC)', minWidth: 300 },
+  { id: 'particulateMatter1', label: 'Particulate Matter 1µm', minWidth: 300 },
+  { id: 'particulateMatter2v5', label: 'Particulate Matter 2.5µm', minWidth: 300 },
+  { id: 'particulateMatter10', label: 'Particulate Matter 10µm', minWidth: 300 },
+  { id: 'formaldehyde', label: 'Formaldehyde (HCHO)', minWidth: 300 },
+  { id: 'carbonMonoxide', label: 'Carbon Monoxide (CO)', minWidth: 300 },
+  { id: 'ozone', label: 'Ozone (O₃)', minWidth: 300 },
+  { id: 'ammonia', label: 'Ammonia (NH3)', minWidth: 300 },
+  { id: 'airflow', label: 'Air Flow Rate (AFR)', minWidth: 300 },
+  { id: 'airIonizationLevel', label: 'Air Ionization Level', minWidth: 300 },
+  { id: 'oxygen', label: 'Oxygen Concentration (O₂)', minWidth: 300 },
+  { id: 'radon', label: 'Radon Gas Concentration (Rn)', minWidth: 300 },
+  { id: 'illuminance', label: 'Illuminance level (Lux)', minWidth: 300 },
+  { id: 'soundLevel', label: 'Sound Pressure Level', minWidth: 300 }
 ];
 
-function formatMeasure(m) {
-  if (!m) return '';
-  const value = typeof m.value === 'number' ? Number(m.value).toFixed(2) : m.value;
-  return `${value}${m.unit ? ' ' + m.unit : ''}`;
+function FormatDoubleMeasurementValue(value, unit) {
+  return `${value} ${unit}`;
+}
+
+function FormatIntMeasurementValue(value, unit) {
+  return value;
 }
 
 export default function Measurements() {
   const [measurements, setMeasurements] = React.useState([]);
+  const [locations, setLocations] = React.useState([]);
+  const [deviceOptions, setDeviceOptions] = React.useState([]);
+
+  //  Pagination
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(25);
-  const [totalCount, setTotalCount] = React.useState(0);
-  const [loading, setLoading] = React.useState(false);
+  const [TotalMeasurements, setTotalMeasurements] = React.useState(0);
+  const [AbsoluteMeasurementsCount, setAbsoluteMeasurementsCount] = React.useState(0);
 
-  // pickers values (initialized to null until backend returns)
+  const [selectedLocation, setSelectedLocation] = React.useState(null);
   const [filterDayFrom, setFilterDayFrom] = React.useState(null);
   const [filterDayTo, setFilterDayTo] = React.useState(null);
+  const [RequestsCollectionUpdated, setRequestsCollectionUpdated] = React.useState(false);
+  const [searchInputValue, setSearchInputValue] = React.useState('');
 
-  // backend-provided hard limits
-  const [dateRangeMin, setDateRangeMin] = React.useState(null);
-  const [dateRangeMax, setDateRangeMax] = React.useState(null);
+  //  Filter menu
+  const [anchorFilterEl, setAnchorFilterEl] = React.useState(null);
+  const filterMenuOpen = Boolean(anchorFilterEl);
+  const handleOpenFilterMenu = (e) => setAnchorFilterEl(e.currentTarget);
+  const handleCloseFilterMenu = () => setAnchorFilterEl(null);
 
-  const [searchText, setSearchText] = React.useState('');
-
-  // indicates whether date-range (min/max) is being loaded
-  const [dateRangeLoading, setDateRangeLoading] = React.useState(true);
-
-  // applied filters (used for backend query after "Zastosuj filtry")
-  const [appliedFilters, setAppliedFilters] = React.useState({
-    text: '',
-    dayFrom: null,
-    dayTo: null
+  //  Filters and sorting
+  const [dateSortOrder, setDateSortOrder] = React.useState('desc');
+  const [SearchText, setSearchText] = React.useState('');
+  const [FiltersAndSettingsChanged, setFiltersAndSettingsChanged] = React.useState(false);
+  const [appliedSettings, setAppliedSettings] = React.useState({
+    SearchText: '',
+    dateSortOrder: 'desc',
+    filterDayFrom: null,
+    filterDayTo: null,
+    selectedLocation: null
   });
-  // applied sort (used in backend query)
-  const [appliedSortOrder, setAppliedSortOrder] = React.useState('desc');
 
-  // visible columns state
-  const [visibleColumnIds, setVisibleColumnIds] = React.useState(() => columns.map(c => c.id));
+  const [serverResponding, setServerResponding] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  const [visibleColumnIds, setVisibleColumnIds] = React.useState(() => {
+    const basicColumnIds = ['index', 'date', 'deviceNumber', 'deviceName', 'locationName']; // ✅ Only actual basic columns
+    const measurementColumnIds = columns.slice(5).map(c => c.id); // ✅ Start from index 5 (temperature)
+    return [...basicColumnIds, ...measurementColumnIds];
+  });
   const [anchorColsEl, setAnchorColsEl] = React.useState(null);
   const colsMenuOpen = Boolean(anchorColsEl);
 
@@ -115,12 +113,77 @@ export default function Measurements() {
   const handleOpenSortMenu = (e) => setAnchorSortEl(e.currentTarget);
   const handleCloseSortMenu = () => setAnchorSortEl(null);
 
-  // measurement-only columns (everything after the first 5 entries)
-  const measurementColumns = React.useMemo(() => columns.slice(5), []);
+  const measurementColumns = React.useMemo(() => columns.slice(5), []); // ✅ Start from index 5
   const measurementIds = React.useMemo(() => measurementColumns.map(c => c.id), [measurementColumns]);
 
+  //  Alert snack
+  const [SnackProgress, setSnackProgress] = React.useState(0);
+  const [SnackMessage, setSnackMessage] = React.useState('');
+  const [SnackDescription, setSnackDescription] = React.useState('');
+  const [DisableSnack, setDisableSnack] = React.useState(false);
+  const SnackIntervalRef = React.useRef(null);
+
+  const checkForChanges = React.useCallback(() => {
+    const currentSettings = {
+      SearchText,
+      dateSortOrder,
+      filterDayFrom,
+      filterDayTo,
+      selectedLocation
+    };
+
+
+    const hasChanges = JSON.stringify(currentSettings) !== JSON.stringify(appliedSettings);
+    setFiltersAndSettingsChanged(hasChanges);
+  }, [SearchText, dateSortOrder, filterDayFrom, filterDayFrom, filterDayTo, appliedSettings, selectedLocation]);
+
+  React.useEffect(() => {
+    checkForChanges();
+  }, [checkForChanges]);
+
+  //  ---------- Snack alerts handlers ----------
+  const CloseSnackAlert_Handler = () => {
+    setDisableSnack(false);
+    setSnackProgress(0);
+
+    // Clear the interval to stop the timer
+    if (SnackIntervalRef.current) {
+      clearInterval(SnackIntervalRef.current);
+      SnackIntervalRef.current = null;
+    }
+  };
+
+  const CreateSnackAlert_Handler = (message, description) => {
+    setRequestsCollectionUpdated(true);
+
+    setSnackMessage(message);
+    setSnackDescription(description);
+
+    setDisableSnack(true);
+    setSnackProgress(0);
+
+    clearInterval(SnackIntervalRef.current);
+
+    const startTime = Date.now();
+    const duration = 3000;
+
+    SnackIntervalRef.current = setInterval(() => {
+      setSnackProgress(() => {
+        const elapsed = Date.now() - startTime;
+        const newProgress = Math.min((elapsed / duration) * 100, 100);
+
+        if (newProgress >= 100) {
+          setDisableSnack(false);
+          clearInterval(SnackIntervalRef.current);
+          return 0;
+        }
+
+        return newProgress;
+      });
+    }, 16);
+  };
+
   const toggleColumn = (id) => {
-    // only allow toggling of measurement columns
     if (!measurementIds.includes(id)) return;
     setVisibleColumnIds(prev => {
       if (prev.includes(id)) return prev.filter(x => x !== id);
@@ -140,457 +203,904 @@ export default function Measurements() {
     setVisibleColumnIds(prev => prev.filter(id => !measurementIds.includes(id)));
   };
 
-  // sorting by date: this is the UI selection in sort menu (immediate)
-  const [dateSortOrder, setDateSortOrder] = React.useState('desc');
+  const FilterLocation_Selected = (location) => {
+    setSelectedLocation(selectedLocation?.id === location.id ? null : location);
+  };
 
+  React.useEffect(() => {
+    FetchAllLocations();
+  }, []);
 
-  // fetch uses appliedFilters/appliedSortOrder + pagination
-  const fetchMeasurements = React.useCallback(async (pageNumber = 1, pageSize = rowsPerPage) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.append('Page', pageNumber);
-      params.append('PageSize', pageSize);
+  const FetchAllLocations = () => {
+    fetch('https://localhost:6061/devices/locations/all')
+      .then(res => {
+        if (!res.ok) throw new Error('Network response was not ok');
+        return res.json();
+      })
+      .then(data => {
+        //console.log(data);
+        setLocations(data);
+      })
+      .catch(err => {
+        setLocations([]);
+      });
+  };
 
-      //const searchInput = document.getElementById('measurement-search-input')?.value ?? '';
-      if (searchText) {
-        params.append('Search', searchText);
-      }
-
-      if(filterDayTo){
-        const filterDateToISO = filterDayTo.toISOString();
-        params.append('DateTo', filterDateToISO);
-      }
-
-      if(filterDayFrom){
-        const filterDatyFromISO = filterDayFrom.toISOString();
-        params.append('DateFrom', filterDatyFromISO);
-      }
-
-      if (dateSortOrder) params.append('SortOrder', dateSortOrder);
-
-      console.log(`[FETCH MEASUREMENTS] - ${params.toString()}`);
-
-      const url = `https://localhost:6063/measurements/query?${params.toString()}`;
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const json = await resp.json();
-      const items = Array.isArray(json.items) ? json.items : (Array.isArray(json.data) ? json.data : (Array.isArray(json) ? json : []));
-      const mapped = items.map((m) => ({
-        id: m.id,
-        day: dayjs(m.registerDate).format('YYYY-MM-DD'),
-        hour: dayjs(m.registerDate).format('HH:mm:ss'),
-        deviceNumber: m.deviceNumber ?? '',
-        deviceName: m.deviceName ?? '',
-        location: m.location ?? '',
-        // measurement columns as preformatted strings
-        temperature: formatMeasure(m.temperature),
-        humidity: formatMeasure(m.humidity),
-        cO2: formatMeasure(m.cO2),
-        voc: formatMeasure(m.voc),
-        particulateMatter1: formatMeasure(m.particulateMatter1),
-        particulateMatter2v5: formatMeasure(m.particulateMatter2v5),
-        particulateMatter10: formatMeasure(m.particulateMatter10),
-        formaldehyde: formatMeasure(m.formaldehyde),
-        co: formatMeasure(m.co),
-        o3: formatMeasure(m.o3),
-        ammonia: formatMeasure(m.ammonia),
-        airflow: formatMeasure(m.airflow),
-        airIonizationLevel: formatMeasure(m.airIonizationLevel),
-        o2: formatMeasure(m.o2),
-        radon: formatMeasure(m.radon),
-        illuminance: formatMeasure(m.illuminance),
-        soundLevel: formatMeasure(m.soundLevel)
-      }));
-      setMeasurements(mapped);
-      setTotalCount(json.totalCount ?? json.total ?? mapped.length);
-    } 
-    catch (e) 
-    {
-      console.log(`[FETCH MEASUREMENTS] - ${e}`);
-      setMeasurements([]);
-      setTotalCount(0);
-    } 
-    finally 
-    {
-      setLoading(false);
-    }
-  }, [filterDayFrom, filterDayTo, rowsPerPage, appliedFilters, dateSortOrder, searchText]);
-
-  const FetchMeasurementsInfo = React.useCallback(async () => {
-    setDateRangeLoading(true);
-    try {
-      const resp = await fetch('https://localhost:6063/measurements/dates');
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const json = await resp.json();
-      
-      console.log(`[FETCH MEASUREMENTS INFO] - ${JSON.stringify(json, null, 2)}`);
-
-      if (json.minDate && dayjs(json.minDate).isValid()) {
-        const min = dayjs(json.minDate).utc();
-        setDateRangeMin(min);
-        setFilterDayFrom(prev => {
-          const newValue = prev ? prev : min;
-          return newValue;
-        });
-      }
-      if (json.maxDate && dayjs(json.maxDate).isValid()) {
-        const max = dayjs(json.maxDate).utc();
-        setDateRangeMax(max);
-        setFilterDayTo(prev => {
-          const newValue = prev ? prev : max;
-          return newValue;
-        });
-      }
-
-    } 
-    catch (err) 
-    {
-      console.log(`[FETCH MEASUREMENTS INFO] - ${err}`);
-    } 
-    finally 
-    {
-      setDateRangeLoading(false);
-    }
+  const FetchDeviceNumbers = React.useCallback(() => {
+    fetch('https://localhost:6061/devices/all')
+      .then(res => {
+        if (!res.ok) throw new Error('Network response was not ok');
+        return res.json();
+      })
+      .then(data => {
+        const devices = Array.isArray(data) ? data : data.items || [];
+        setDeviceOptions(devices);
+      })
+      .catch(err => {
+        console.error('Failed to fetch devices:', err);
+        setDeviceOptions([]);
+      });
   }, []);
 
   React.useEffect(() => {
-    FetchMeasurementsInfo();
-  }, [FetchMeasurementsInfo]);
+    FetchDeviceNumbers();
+  }, [FetchDeviceNumbers]);
+
+  const FetchMeasurements = React.useCallback(() => {
+    setIsLoading(true);
+
+    const params = new URLSearchParams({
+      Page: (page + 1).toString(),
+      PageSize: rowsPerPage.toString(),
+      SortOrder: dateSortOrder,
+    });
+
+    if (SearchText) {
+      params.append('DeviceNumber', SearchText);
+    }
+    if (filterDayFrom) {
+      const utcDateStart = dayjs(filterDayFrom).startOf('day').utc().toISOString();
+      params.append('DateStart', utcDateStart);
+    }
+    if (filterDayTo) {
+      const utcDateEnd = dayjs(filterDayTo).endOf('day').utc().toISOString();
+      params.append('DateEnd', utcDateEnd);
+    }
+    if (selectedLocation) {
+      params.append('LocationID', selectedLocation.id);
+    }
+
+    fetch(`https://localhost:6063/measurements/combined/all?${params.toString()}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Network response was not ok');
+        return res.json();
+      })
+      .then(data => {
+        setTimeout(() => {
+          const mapped = data.items.map((m, idx) => ({
+            index: page * rowsPerPage + idx + 1,
+            date: dayjs(m.recordedAt).format('HH:mm - DD MMMM YYYY'),
+            deviceNumber: m.deviceNumber,
+            deviceName: m.deviceName,
+            locationName: m.locationName,
+            temperature: FormatDoubleMeasurementValue(m.temperature, '°C'),
+            humidity: FormatDoubleMeasurementValue(m.humidity, '%'),
+            carbonDioxide: FormatDoubleMeasurementValue(m.carbonDioxide, 'ppm'),
+            volatileOrganicCompounds: FormatDoubleMeasurementValue(m.volatileOrganicCompounds, 'µg/m³'),
+            particulateMatter1: FormatDoubleMeasurementValue(m.particulateMatter1, 'µg/m³'),
+            particulateMatter2v5: FormatDoubleMeasurementValue(m.particulateMatter2v5, 'µg/m³'),
+            particulateMatter10: FormatDoubleMeasurementValue(m.particulateMatter10, 'µg/m³'),
+            formaldehyde: FormatDoubleMeasurementValue(m.formaldehyde, 'µg/m³'),
+            carbonMonoxide: FormatDoubleMeasurementValue(m.carbonMonoxide, 'ppm'),
+            ozone: FormatDoubleMeasurementValue(m.ozone, 'ppb'),
+            ammonia: FormatDoubleMeasurementValue(m.ammonia, 'µg/m³'),
+            airflow: FormatDoubleMeasurementValue(m.airflow, 'CFM'),
+            airIonizationLevel: FormatDoubleMeasurementValue(m.airIonizationLevel, 'ions/m³'),
+            oxygen: FormatDoubleMeasurementValue(m.oxygen, '%'),
+            radon: FormatDoubleMeasurementValue(m.radon, 'Bq/m³'),
+            illuminance: FormatDoubleMeasurementValue(m.illuminance, 'lx'),
+            soundLevel: FormatDoubleMeasurementValue(m.soundLevel, 'dB')
+          }));
+          setMeasurements(mapped);
+          setTotalMeasurements(data.totalCount || data.total || data.length || 0);
+          setAbsoluteMeasurementsCount(data.absoluteCount)
+          setRequestsCollectionUpdated(false);
+          setIsLoading(false);
+        }, 1200);
+      })
+      .catch(err => {
+        setMeasurements([]);
+        setTotalMeasurements(0);
+        setAbsoluteMeasurementsCount(0);
+        setIsLoading(false);
+      });
+  }, [page, rowsPerPage, filterDayFrom, filterDayTo, dateSortOrder, selectedLocation, SearchText]);
 
   React.useEffect(() => {
-    fetchMeasurements(1, rowsPerPage);
-  }, []);
+    FetchMeasurements();
+  }, [page, rowsPerPage]);
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
-    fetchMeasurements(newPage + 1, rowsPerPage);
   };
 
   const handleChangeRowsPerPage = (event) => {
     const newSize = +event.target.value;
     setRowsPerPage(newSize);
     setPage(0);
-    fetchMeasurements(1, newSize);
   };
 
-  // clamp helper: returns a dayjs between min and max if bounds exist
-  const clampToRange = (value, min, max) => {
-    if (!value) return value;
-    if (min && dayjs(value).isBefore(min)) return min;
-    if (max && dayjs(value).isAfter(max)) return max;
-    return value;
-  };
-
-  const handleApplyFilters = () => {
-    // clamp selected dates to backend-provided range before applying
-    const clampedFrom = clampToRange(filterDayFrom, dateRangeMin, dateRangeMax);
-    const clampedTo = clampToRange(filterDayTo, dateRangeMin, dateRangeMax);
-
-    setFilterDayFrom(clampedFrom);
-    setFilterDayTo(clampedTo);
-
+  const RefreshMeasurements_ButtonClick = () => {
     setPage(0);
-    // run fetch after state updates (use timeout tick to ensure applied* updated)
-    setTimeout(() => fetchMeasurements(1, rowsPerPage), 0);
+    FetchMeasurements()
   };
 
-  const handleClearAll = () => {
-    // clear search, dates and sorting
+  const ClearSortFilter_ButtonClick = () => {
     setSearchText('');
     setFilterDayFrom(null);
     setFilterDayTo(null);
     setDateSortOrder('desc');
-    setPage(0);
+    setSelectedLocation(null);
 
-    setTimeout(() => fetchMeasurements(1, rowsPerPage), 0);
+    const defaultSettings = {
+      SearchText: '',
+      dateSortOrder: 'desc',
+      filterDayFrom: null,
+      filterDayTo: null,
+      selectedLocation: null,
+    };
+
+    setAppliedSettings(defaultSettings);
+    setFiltersAndSettingsChanged(false);
   };
 
-  // columns to actually render
-  const columnsToShow = React.useMemo(() => columns.filter(c => visibleColumnIds.includes(c.id)), [visibleColumnIds]);
+  const columnsToShow = React.useMemo(() => {
+    const basicColumns = columns.slice(0, 5); // ✅ First 5 columns are basic (index, date, deviceNumber, deviceName, locationName)
+    const selectedMeasurementColumns = columns.slice(5).filter(c => visibleColumnIds.includes(c.id)); // ✅ Measurements start at index 5
+    return [...basicColumns, ...selectedMeasurementColumns];
+  }, [visibleColumnIds]);
 
-  // selected measurement count (for badge)
   const selectedMeasurementCount = measurementIds.filter(id => visibleColumnIds.includes(id)).length;
 
+  //  ---------- SignalR - WebSockets ----------
+  React.useEffect(() => {
+    let connection = null;
+
+    connection = new SignalR.HubConnectionBuilder()
+      .withUrl('https://localhost:6063/measurementhub')
+      .configureLogging(SignalR.LogLevel.None)
+      .withAutomaticReconnect({
+        nextRetryDelayInMilliseconds: (retryContext) => {
+          return 5000;
+        }
+      })
+      .build();
+
+    connection.onclose((error) => {
+      if (error) {
+        //console.log('[SIGNALR] Connection closed with error:', error);
+      } else {
+        //console.log('[SIGNALR] Connection closed gracefully');
+      }
+    });
+
+    connection.onreconnecting((error) => {
+      //console.log('[SIGNALR] Attempting to reconnect...');
+      setServerResponding(false);
+    });
+
+    connection.onreconnected((connectionId) => {
+      //console.log('[SIGNALR] Reconnected successfully with connection ID:', connectionId);
+      setServerResponding(true);
+    });
+
+    connection.start()
+      .then(() => {
+        //console.log('[SIGNALR] Connected to ReportsHub successfully');
+        setServerResponding(true);
+        connection.on('MeasurementCreated', (dto) => {
+          CreateSnackAlert_Handler('Measurement captured', `Device captured new measurement. To apply latest changes refresh collection!`);
+        });
+      })
+      .catch((error) => {
+        //console.log('[SIGNALR] Failed to connect to ReportsHub:', error);
+        setServerResponding(false);
+      });
+
+    return () => {
+      if (connection) {
+        //console.log('[SIGNALR] Disconnecting from ReportsHub...');
+        setServerResponding(false);
+        connection.stop().catch((error) => {
+          //console.log('[SIGNALR] Error while disconnecting:', error);
+        });
+      }
+      if (SnackIntervalRef.current) {
+        clearInterval(SnackIntervalRef.current);
+      }
+    };
+  }, []);
+
   return (
-    <Box sx={{ 
-      width: '100%', 
-      height: '100%', 
-      display: 'flex', 
+    <Box sx={{
+      width: '100%',
+      height: '100%',
+      display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden'
     }}>
       {/* Filter controls at top */}
-      <Paper sx={{ mb: 1 }}>
-        <Box sx={{ display: 'flex', gap: 1, mt: 1, mb: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Paper sx={{ display: 'flex', m: 1, justifyContent: 'space-between', flexWrap: 'wrap', flexDirection: 'column' }}>
 
-          <TextField
-            label="Search"
-            variant="outlined"
-            size = 'small'
-            id="measurement-search-input"
-            defaultValue={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            sx={{ minWidth: 300 }}
-            slotProps={{
-            }}/>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 1,flexWrap: 'wrap', flexDirection: 'row' }}>
+          <Box sx={{ gap: 0, m: 1 }}>
+            <Typography fontWeight='bold' variant='h5'>Measurements</Typography>
+            <Typography variant='subtitle2' sx={{ color: (theme) => theme.palette.custompalette.airsuperiorityblue }}>Browse captured measurements!</Typography>
+          </Box>
+        </Box>
 
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            {/* From picker (disabled while date range loads). min/max prevent selecting outside backend range */}
-            <DateTimePicker
-              label="From"
-              variant="outlined"
-              size="medium"
-              slotProps={{
-              textField : { size: 'small', variant: 'outlined' }, }}
-              id="measurement-dayfrom-picker"
-              value={filterDayFrom}
-              onChange={(v) => setFilterDayFrom(v)}
-              //slotProps={{ textField: { size: 'small', variant: 'standard' } }}
-              disabled={dateRangeLoading}
-              {...(dateRangeMin ? { minDateTime: dateRangeMin } : {})}
-              {...(dateRangeMax ? { maxDateTime: dateRangeMax } : {})}
-             ampm={false}
-             inputFormat="YYYY-MM-DD HH:mm"
+        <Paper sx={{ display: 'flex', m: 1, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+
+            {/* Search field */}
+            <Autocomplete
+              id="device-search-autocomplete"
+              value={SearchText}
+              onChange={(event, newValue) => {
+                const deviceValue = typeof newValue === 'object' && newValue?.deviceNumber ? newValue.deviceNumber : (newValue || '');
+                setSearchText(deviceValue);
+              }}
+              inputValue={searchInputValue}
+              onInputChange={(event, newInputValue) => {
+                setSearchInputValue(newInputValue);
+                setSearchText(newInputValue);
+              }}
+              options={deviceOptions}
+              getOptionLabel={(option) => {
+                if (typeof option === 'string') return option;
+                return option.deviceNumber || option.toString();
+              }}
+              renderOption={(props, option) => {
+                const { key, ...itemProps } = props;
+                return (
+                  <Box component="li" key={key} {...itemProps}>
+                    <Typography variant="body2">
+                      {option.name ? `${option.name} - ${option.deviceNumber}` : option.deviceNumber}
+                    </Typography>
+                  </Box>
+                );
+              }}
+              freeSolo
+              clearOnBlur={false}
+              disabled={!serverResponding || isLoading}
+              sx={{ minWidth: 450 }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Search"
+                  placeholder="Type or select Device Name"
+                  variant="outlined"
+                  size="small"
+                />
+              )}
             />
 
-            {/* To picker (disabled while date range loads). min/max prevent selecting outside backend range */}
-            <DateTimePicker
-              label="To"
-              id="measurement-dayto-picker"
-              slotProps={{
-              textField: { size: 'small', variant: 'outlined' }, }}
-              value={filterDayTo}
-              onChange={(v) => setFilterDayTo(v)}
-              //slotProps={{ textField: { size: 'small', variant: 'standard' } }}
-              disabled={dateRangeLoading}
-              {...(dateRangeMin ? { minDateTime: dateRangeMin } : {})}
-              {...(dateRangeMax ? { maxDateTime: dateRangeMax } : {})}
-             ampm={false}
-             inputFormat="YYYY-MM-DD HH:mm"
-            />
-          </LocalizationProvider>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              {/* Date from */}
+              <Badge
+                variant="dot"
+                invisible={!filterDayFrom}
+                sx={{
+                  '& .MuiBadge-dot': {
+                    backgroundColor: (theme) => theme.palette.custompalette.maize
+                  }
+                }}>
 
-          {/* Columns chooser button */}
-          <Tooltip title="Columns">
-            <IconButton onClick={handleOpenColsMenu} sx={{ ml: 1 }}>
-              <Badge badgeContent={selectedMeasurementCount} color="primary">
-                <ViewWeekOutlinedIcon />
+                <DatePicker
+                  label="From"
+                  variant="outlined"
+                  size="medium"
+                  disabled={!serverResponding || isLoading}
+                  value={filterDayFrom}
+                  onChange={(v) => setFilterDayFrom(v)}
+                  clearable
+                  slotProps={{
+                    textField: { size: 'small', variant: 'outlined' },
+                    actionBar: {
+                      actions: ['clear']
+                    }
+                  }}
+                  maxDate={filterDayTo || undefined}
+                />
               </Badge>
-            </IconButton>
-          </Tooltip>
-          <Menu
-            anchorEl={anchorColsEl}
-            open={colsMenuOpen}
-            onClose={handleCloseColsMenu}
-            MenuListProps={{ dense: true }}
-            PaperProps={{
-              style: {
-                width: 360,    // stała szerokość
-                height: 420,   // stała wysokość
-                display: 'flex',
-                flexDirection: 'column'
-              }
-            }}
-          >
-            <Paper
-              variant="outlined"
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                height: 400, // or any fixed height — required for flex/scroll layout
-                overflow: 'hidden', // prevent Paper itself from scrolling
+
+              {/* Date to */}
+              <Badge
+                variant="dot"
+                invisible={!filterDayTo}
+                sx={{
+                  '& .MuiBadge-dot': {
+                    backgroundColor: (theme) => theme.palette.custompalette.maize
+                  }
+                }}>
+
+                <DatePicker
+                  label="To"
+                  value={filterDayTo}
+                  onChange={(v) => setFilterDayTo(v)}
+                  disabled={!serverResponding || isLoading}
+                  clearable
+                  slotProps={{
+                    textField: { size: 'small', variant: 'outlined' },
+                    actionBar: {
+                      actions: ['clear']
+                    }
+                  }}
+                  minDate={filterDayFrom || undefined}
+                />
+              </Badge>
+            </LocalizationProvider>
+
+            {/* Filters */}
+            <Tooltip title="Filter">
+              <span>
+                <IconButton onClick={handleOpenFilterMenu} disabled={!serverResponding || isLoading}>
+                  <FilterListIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Menu
+              anchorEl={anchorFilterEl}
+              open={filterMenuOpen}
+              onClose={handleCloseFilterMenu}
+            >
+              <Paper
+                variant="outlined"
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* List of options for locations */}
+                <Box sx={{ flex: 1, overflow: 'auto' }}>
+                  <Typography sx={{
+                    fontWeight: 'bold',
+                    ml: 1,
+                    mt: 1
+                  }}>Location</Typography>
+                  {locations.map((location) => (
+                    <MenuItem
+                      key={location.id}
+                      size='small'
+                      selected={selectedLocation?.id === location.id}
+                      onClick={() => FilterLocation_Selected(location)}
+                    >
+                      <Switch
+                        size='small'
+                        checked={selectedLocation?.id === location.id}
+                        sx={{ mr: 1 }}
+                      />
+                      <ListItemText primary={location.name} />
+                    </MenuItem>
+                  ))}
+                </Box>
+              </Paper>
+            </Menu>
+
+            {/* Sorting button */}
+            <Tooltip title="Sort">
+              <span>
+                <IconButton onClick={handleOpenSortMenu}
+                  disabled={!serverResponding || isLoading}
+                >
+                  <SortIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Menu
+              anchorEl={anchorSortEl}
+              open={sortMenuOpen}
+              onClose={handleCloseSortMenu}
+            >
+              <Paper
+                variant="outlined"
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                }}
+              >
+                <Box sx={{ flex: 1, overflow: 'auto' }}>
+                  <Typography sx={{
+                    fontWeight: 'bold',
+                    ml: 1,
+                    mt: 1
+                  }}>Measurement date</Typography>
+                  <MenuItem
+                    selected={dateSortOrder === 'asc'}
+                    onClick={() => setDateSortOrder('asc')}
+                  >
+                    <Switch
+                      size="small"
+                      checked={dateSortOrder === 'asc'}
+                      sx={{ mr: 1 }}
+                    />
+                    <ListItemText primary="Ascending (oldest first)" />
+                  </MenuItem>
+
+                  <MenuItem
+                    selected={dateSortOrder === 'desc'}
+                    onClick={() => setDateSortOrder('desc')}
+                  >
+                    <Switch
+                      size="small"
+                      checked={dateSortOrder === 'desc'}
+                      sx={{ mr: 1 }}
+                    />
+                    <ListItemText primary="Descending (newest first)" />
+                  </MenuItem>
+                </Box>
+              </Paper>
+            </Menu>
+
+            {/* Measurements */}
+            <Tooltip title="Measurements">
+              <span>
+                <IconButton onClick={handleOpenColsMenu}
+                  disabled={!serverResponding || isLoading}
+                >
+                  <Badge
+                    badgeContent={selectedMeasurementCount}
+                    invisible={selectedMeasurementCount === 0}
+                    sx={{
+                      '& .MuiBadge-badge': {
+                        backgroundColor: (theme) => theme.palette.custompalette.maize,
+                        color: 'black'
+                      }
+                    }}>
+                    <ViewWeekOutlinedIcon />
+                  </Badge>
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Menu
+              anchorEl={anchorColsEl}
+              open={colsMenuOpen}
+              onClose={handleCloseColsMenu}
+              MenuListProps={{ dense: true }}
+              PaperProps={{
+                style: {
+                  width: 360,
+                  height: 420,
+                  display: 'flex',
+                  flexDirection: 'column'
+                }
               }}
             >
-              <Box sx={{ p: 1, paddingLeft: 1.5, display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
-                <Typography width="100%" fontWeight='bold' variant="subtitle1">Columns</Typography>
-                <IconButton onClick={handleCloseColsMenu} sx={{ ml: 1 }} >
-                    <CloseIcon />
-                </IconButton>
-              </Box>
-              
-              <Divider/>
-
-              {/* scrollable list */}
-              <Box
+              <Paper
+                variant="outlined"
                 sx={{
-                  flex: 1,
-                  overflowY: 'auto', // only the list scrolls
-                  pr: 1, // optional: prevent scrollbar overlap
-                }}
-              >
-                {measurementColumns.map(col => (
-                  <MenuItem key={col.id} onClick={() => toggleColumn(col.id)} disableRipple>
-                    <Switch checked={visibleColumnIds.includes(col.id)} size="small"/>
-                    <ListItemText primary={col.label} />
-                  </MenuItem>
-                ))}
-              </Box>
-
-              {/* footer fixed to bottom */}
-              <Box
-                sx={{
-                  p: 1,
                   display: 'flex',
-                  gap: 1,
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderTop: '1px solid rgba(255,255,255,0.1)', // subtle separator
-                  flexShrink: 0, // prevent footer from shrinking or scrolling
-                  backgroundColor: '#10151b', // keep it visually separate if dark theme
+                  flexDirection: 'column',
+                  height: 400,
+                  overflow: 'hidden',
                 }}
               >
-                <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
-                  <Button size="small" onClick={selectAllMeasurements} variant="text">Select</Button>
-                  <Button size="small" onClick={clearMeasurementSelection} variant="text">Unselect</Button>
+                <Box sx={{ p: 1, paddingLeft: 1.5, display: 'flex', flexDirection: 'row', alignItems: 'center', mb: 0 }}>
+                  <Typography sx={{
+                    fontWeight: 'bold',
+                    //ml: 1,
+                    //mt: 1
+                  }}>Measurements</Typography>
                 </Box>
-              </Box>
-            </Paper>
+                {/* scrollable list */}
+                <Box
+                  sx={{
+                    mt: 0,
+                    flex: 1,
+                    overflowY: 'auto',
+                    pr: 1,
+                  }}
+                >
+                  {measurementColumns.map(col => (
+                    <MenuItem key={col.id} onClick={() => toggleColumn(col.id)} disableRipple>
+                      <Switch checked={visibleColumnIds.includes(col.id)} size="small" />
+                      <ListItemText primary={col.label} />
+                    </MenuItem>
+                  ))}
+                </Box>
 
-          </Menu>
+                {/* footer fixed to bottom */}
+                <Box
+                  sx={{
+                    p: 1,
+                    display: 'flex',
+                    gap: 1,
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderTop: '1px solid rgba(255,255,255,0.1)',
+                    flexShrink: 0,
+                    backgroundColor: '#10151b',
+                  }}
+                >
+                  <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                    <Button size="small" onClick={selectAllMeasurements} variant="text">Select All</Button>
+                    <Button size="small" onClick={clearMeasurementSelection} variant="text">Unselect All</Button>
+                  </Box>
+                </Box>
+              </Paper>
+            </Menu>
+          </Box>
 
-          {/* Sorting */}
-          <Tooltip title="Sorting">
-            <IconButton onClick={handleOpenSortMenu} sx={{ ml: 1 }}>
-              <SortIcon />
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Refresh button */}
+            <IconButton
+              size='medium'
+              disabled={!serverResponding || isLoading}
+              onClick={RefreshMeasurements_ButtonClick}
+            >
+              <Badge
+                variant="dot"
+                sx={{
+                  '& .MuiBadge-dot': {
+                    backgroundColor: (theme) => {
+                      if (RequestsCollectionUpdated === true) {
+                        return theme.palette.custompalette.rustyred;
+                      }
+                      else {
+                        return theme.palette.custompalette.persiangreen;
+                      }
+                    }
+                  }
+                }}
+              >
+                <CachedOutlinedIcon />
+              </Badge>
             </IconButton>
-          </Tooltip>
-          <Menu
-            anchorEl={anchorSortEl}
-            open={sortMenuOpen}
-            onClose={handleCloseSortMenu}
-          >
-            <Paper
-              variant="outlined"
-              sx={{
+
+            {/* Snack */}
+            <Snackbar
+              open={DisableSnack}
+              padding={2}
+              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+
+              <Paper variant='outlined' sx={{
+                width: 300,
+                padding: 1,
+                margin: 1,
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
-              }}
+              }}>
+
+                {/* Top bar */}
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  mb: 1,
+                  alignContent: 'center',
+                  justifyContent: 'space-between',
+                  flexDirection: 'rows',
+                }}>
+                  <CampaignIcon sx={{
+                    color: (theme) => theme.palette.custompalette.maize
+                  }} />
+
+                  <Typography variant="body2">
+                    {SnackMessage}
+                  </Typography>
+
+                  {/* Close button */}
+                  <IconButton
+                    size="small"
+                    onClick={CloseSnackAlert_Handler}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+
+                <Divider></Divider>
+
+                <Typography variant="subtitle2" align="justify" sx={{ mt: 1, color: (theme) => theme.palette.custompalette.airsuperiorityblue }}>
+                  {SnackDescription}
+                </Typography>
+
+                <LinearProgress variant="determinate" sx={{ mt: 1 }} value={SnackProgress} />
+              </Paper>
+            </Snackbar>
+
+            {/* Clear button */}
+            <Tooltip
+              title={"Clear"}
             >
-              <Box sx={{ p: 1, paddingLeft: 1.5, display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
-                <Typography width="100%" fontWeight='bold' variant="subtitle1">Sorting (Date)</Typography>
-                <IconButton onClick={handleCloseSortMenu} sx={{ ml: 1 }} >
-                    <CloseIcon />
+              <span>
+                <IconButton
+                  disabled={!serverResponding || isLoading || !FiltersAndSettingsChanged}
+                  size='medium'
+                  onClick={ClearSortFilter_ButtonClick}
+                  sx={(theme) => ({
+                    backgroundColor: 'transparent',
+                    color: theme.palette.custompalette.indianred,
+                    transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.custompalette.indianred, 0.12),
+                      color: theme.palette.custompalette.indianred,
+                    },
+                    '&:active': {
+                      backgroundColor: alpha(theme.palette.custompalette.indianred, 0.18),
+                    },
+                    '&:disabled': {
+                      opacity: 0.3,
+                      cursor: 'not-allowed',
+                      color: theme.palette.action.disabled
+                    }
+                  })}
+                >
+                  <DeleteSweepOutlinedIcon />
                 </IconButton>
-              </Box>
+              </span>
+            </Tooltip>
 
-              <Divider/>
+          </Box>
+        </Paper>
 
-              {/* List of options for sorting */}
-              <Box sx={{ flex: 1, overflow: 'auto' }}>
-                <MenuItem
-                  onClick={() => { setDateSortOrder('asc'); }}
-                  selected={dateSortOrder === 'asc'}
-                  >
-                  <Switch checked={dateSortOrder === 'asc'} size="small" />
-                  <ListItemText primary="Ascending (oldest first)" />
-                </MenuItem>
-
-                <MenuItem
-                  onClick={() => { setDateSortOrder('desc'); }}
-                  selected={dateSortOrder === 'desc'}
-                  >
-                  <Switch checked={dateSortOrder === 'desc'} size="small" />
-                  <ListItemText primary="Descending (newest first)" />
-                </MenuItem>
-              </Box>
-            </Paper>
-          </Menu>
-
-          <Button variant="outlined" onClick={handleApplyFilters} sx={{ ml: 'auto' }} disabled={loading} startIcon={<CheckOutlinedIcon />}>Apply</Button>
-          <Button variant="outlined" color='error' onClick={handleClearAll} sx={{ ml: 1 }} disabled={loading} startIcon={<DeleteIcon />}>Clear</Button>
-        </Box>
       </Paper>
 
-      <Divider/>
+      {/* Divider */}
+      {/* <Divider sx={{ mb: 0 }} /> */}
 
-      {/* Main table area - takes remaining space */}
-      <Paper sx={{ 
-        flexGrow: 1, 
-        display: 'flex', 
-        flexDirection: 'column',
-        overflow: 'hidden',
+      <Box sx={{
+        flexGrow: 1,
+        overflow: 'auto',
+        ml: 2,
+        mr: 2,
+        minHeight: 0,
+        display: 'flex',
         position: 'relative'
       }}>
-        {/* loading overlay */}
-        {loading && (
+
+        {/* Server not reponding! */}
+        <Fade
+          in={!serverResponding}
+          timeout={{ enter: 600, exit: 300 }}
+          unmountOnExit
+        >
+          <Box sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            alignContent: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            width: '100%',
+            height: '100%'
+          }}>
+            <InfoLabel
+              mainlabel="Server not responding"
+              icon={WifiOffOutlinedIcon}
+              description={"Measurements service is not responding right now, try again later."}
+            />
+          </Box>
+        </Fade>
+
+        {/* System responding but no measurements in the system! */}
+        <Fade
+          in={serverResponding && !isLoading && measurements.length === 0 && AbsoluteMeasurementsCount === 0}
+          timeout={{ enter: 600, exit: 300 }}
+          unmountOnExit
+        >
+          <Box sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            alignContent: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            width: '100%',
+            height: '100%'
+          }}>
+            <InfoLabel
+              mainlabel="No measurements available!"
+              icon={CloudOffOutlinedIcon}
+              description={"No measurement data found. Please ensure your measurement devices are powered on and connected to begin data collection."}
+            />
+          </Box>
+        </Fade>
+
+        {/* System responding but no measurements for this filters! */}
+        <Fade
+          in={serverResponding && !isLoading && measurements.length === 0 && AbsoluteMeasurementsCount > 0}
+          timeout={{ enter: 600, exit: 300 }}
+          unmountOnExit
+        >
           <Box
             sx={{
               position: 'absolute',
-              inset: 0,
-              zIndex: 20,
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
               display: 'flex',
               alignItems: 'center',
+              alignContent: 'center',
               justifyContent: 'center',
-              backgroundColor: 'rgba(0,0,0,0.3)',
-              backdropFilter: 'blur(2px)',
-              WebkitBackdropFilter: 'blur(2px)',
+              flexDirection: 'column',
+              width: '100%',
+              height: '100%'
             }}
           >
-            <CircularProgress size="8rem" />
+            <InfoLabel
+              mainlabel="No measurements found!"
+              icon={CloudOffOutlinedIcon}
+              description={"No measurements match your current filters. Try modifying the search criteria or clearing filters to see more results."}
+            />
           </Box>
-        )}
+        </Fade>
 
-        {/* Table container - grows to fill available space */}
-        <TableContainer sx={{ 
-          flexGrow: 1, 
-          overflow: 'auto',
-          minHeight: 0 
-        }}>
-          <Table stickyHeader aria-label="measurements table">
-            <TableHead>
-              <TableRow>
-                <TableCell style={{ minWidth: 60, fontWeight: 'bold' }}>Index</TableCell>
-                {columnsToShow.map((column) => (
-                  <TableCell key={column.id} style={{ minWidth: column.minWidth, fontWeight: 'bold' }}>
-                    {column.label}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
+        {/* System responding and loading measurements! */}
+        <Fade
+          in={serverResponding && isLoading}
+          timeout={{ enter: 600, exit: 300 }}
+          unmountOnExit
+        >
+          <Box sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            alignContent: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            width: '100%',
+            height: '100%'
+          }}>
+            <LoadingLabel
+              mainlabel="Loading measurements..."
+              icon={CloudOutlinedIcon}
+              description={"Homee system is retrieveing measurements from database"}
+            />
+          </Box>
+        </Fade>
 
-            <TableBody>
-              {measurements.length === 0 && !loading ? (
+        {/* System responding and displaying measurements list */}
+        <Fade
+          in={serverResponding && !isLoading && measurements.length > 0}
+          timeout={{ enter: 600, exit: 300 }}
+          unmountOnExit
+        >
+          <TableContainer sx={{
+            flexGrow: 1,
+            overflow: 'auto',
+            minHeight: 0,
+            display: 'flex',
+            position: 'relative'
+          }}>
+
+            <Table stickyHeader aria-label="measurements table">
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={columnsToShow.length + 1} align="center" sx={{ py: 6, color: '#888' }}>
-                    No measurements to display.
-                  </TableCell>
+                  {/* <TableCell style={{ minWidth: 60, fontWeight: 'bold', textAlign: 'center' }}>Index</TableCell> */}
+                  {columnsToShow.map((column) => (
+                    <TableCell
+                      key={column.id}
+                      style={{
+                        minWidth: column.minWidth,
+                        fontWeight: 'bold',
+                        textAlign: ['index', 'date', 'deviceNumber', 'deviceName', 'locationName'].includes(column.id) ? 'left' : 'right'
+                      }}
+                    >
+                      <Typography fontWeight='bold' variant='subtitle2'>
+                        {column.label}
+                      </Typography>
+                    </TableCell>
+                  ))}
                 </TableRow>
-              ) : (
-                measurements.map((row, idx) => {
+              </TableHead>
+
+              <TableBody>
+                {measurements.map((row, idx) => {
                   const tableIndex = page * rowsPerPage + idx + 1;
                   return (
-                    <TableRow hover tabIndex={-1} key={row.id || `${row.deviceNumber}-${tableIndex}`}>
-                      <TableCell>{tableIndex}</TableCell>
+                    <TableRow
+                      hover
+                      tabIndex={-1}
+                      key={row.index || `${row.deviceNumber}-${tableIndex}`}
+                      sx={{
+                        '& .copy-button': {
+                          opacity: 0,
+                        },
+                        '&:hover .copy-button': {
+                          opacity: 1
+                        }
+                      }}
+                    >
                       {columnsToShow.map((column) => (
-                        <TableCell key={column.id}>
-                          {row[column.id] ?? ''}
+                        <TableCell
+                          key={column.id}
+                          style={{
+                            textAlign: ['index', 'date', 'deviceNumber', 'deviceName', 'locationName'].includes(column.id)
+                              ? 'left'
+                              : 'right'
+                          }}
+                        >
+                          {(['deviceNumber', 'deviceName', 'locationName'].includes(column.id) && row[column.id] !== '') ?
+                            (<Box sx={{ display: 'flex', justifyContent: 'flex-start', alignContent: 'center', alignItems: 'center', gap: 1 }}>
+                              <Typography variant='subtitle2'>{row[column.id] ?? ''}</Typography>
+                              <Tooltip title="Copy to clipboard" className="copy-button">
+                                <span>
+                                  <IconButton
+                                    size='small'
+                                    onClick={() => {
+                                      const textToCopy = row[column.id] ?? '';
+                                      if (textToCopy) {
+                                        navigator.clipboard.writeText(textToCopy).then(() => {
+                                          // Optional: Show a brief success message
+                                        }).catch(err => {
+                                          //console.error('Failed to copy to clipboard:', err);
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    <CopyAllIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                            </Box>) :
+                            (<Typography variant='subtitle2'>{row[column.id] ?? '-'}</Typography>)}
                         </TableCell>
                       ))}
                     </TableRow>
                   );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                }
+                )}
+              </TableBody>
+            </Table>
 
-       <Divider />
 
-       {/* Pagination fixed at bottom inside the Paper */}
-       <TablePagination
-         rowsPerPageOptions={[10, 25, 50, 100]}
-         component="div"
-         count={totalCount}
-         rowsPerPage={rowsPerPage}
-         page={page}
-         onPageChange={handleChangePage}
-         onRowsPerPageChange={handleChangeRowsPerPage}
-         sx={{ 
-           flexShrink: 0,  // prevent pagination from shrinking
-         }}
-       />
+          </TableContainer>
+        </Fade>
+
+      </Box>
+
+      {/* Divider */}
+      {/* <Divider sx={{ mt: 0 }} /> */}
+
+      {/* Pagination */}
+      <Paper sx={{
+        display: 'flex',
+        mr: 1,
+        ml: 1,
+        padding: 0,
+        flexDirection: 'column',
+      }}>
+        {/* Pagination fixed at bottom inside the Paper */}
+        <TablePagination
+          rowsPerPageOptions={[25, 50, 100]}
+          component="div"
+          disabled={!serverResponding || isLoading}
+          count={TotalMeasurements}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          sx={{
+            padding: 0,
+            flexShrink: 0,
+          }}
+        />
       </Paper>
     </Box>
   );

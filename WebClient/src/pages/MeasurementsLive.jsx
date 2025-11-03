@@ -3,50 +3,52 @@ import Box from '@mui/material/Box';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell, { tableCellClasses } from '@mui/material/TableCell';
+import Skeleton from '@mui/material/Skeleton';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
+import { DataGrid } from '@mui/x-data-grid';
 import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
+import CopyAllIcon from '@mui/icons-material/CopyAll';
+import Fade from '@mui/material/Fade';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import TextField from '@mui/material/TextField';
 import Dialog from '@mui/material/Dialog';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
-import Badge from '@mui/material/Badge';
-import Button from '@mui/material/Button';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import IconButton from '@mui/material/IconButton';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import DialogActions from '@mui/material/DialogActions';
 import * as SignalR from '@microsoft/signalr';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import DeleteIcon from '@mui/icons-material/Delete';
+import MeasurementDetailsTable from '../components/MeasurementDetailsTable';
+
 import dayjs from 'dayjs';
+import Badge from '@mui/material/Badge';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import Tooltip from '@mui/material/Tooltip';
 import Divider from '@mui/material/Divider';
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import CloseIcon from '@mui/icons-material/Close';
 import { styled } from '@mui/material/styles';
-import SearchOffIcon from '@mui/icons-material/SearchOff';
+import LoadingLabel from '../components/LoadingLabel';
+import DeleteSweepOutlinedIcon from '@mui/icons-material/DeleteSweepOutlined';
 import { alpha } from '@mui/material/styles';
-import Collapse from '@mui/material/Collapse';
+import Checkbox from '@mui/material/Checkbox';
+import InfoLabel from '../components/InfoLabel';
+import { WifiOffOutlined as WifiOffOutlinedIcon, CloudOffOutlined as CloudOffOutlinedIcon, CloudOutlined as CloudOutlinedIcon } from '@mui/icons-material';
+import { useDebouncedCallback } from 'use-debounce'; // npm install use-debounce
 dayjs.extend(customParseFormat);
 
 const columns = [
-  { id: 'day', label: 'Day', minWidth: 50 },
-  { id: 'hour', label: 'Hour', minWidth: 50 },
-  { id: 'deviceName', label: 'Device Name', minWidth: 120 },
-  { id: 'deviceNumber', label: 'Device Number', minWidth: 300 },
-  { id: 'location', label: 'Location', minWidth: 120 }
+  { id: 0, name: 'deviceName', label: 'Device Name', minWidth: 120 },
+  { id: 1, name: 'date', label: 'Date', minWidth: 50 },
+  { id: 2, name: 'location', label: 'Location', minWidth: 120 },
+  { id: 3, name: 'deviceNumber', label: 'Device Number', minWidth: 300 },
 ];
 
 function descendingComparator(a, b, orderBy) {
@@ -99,7 +101,7 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   },
   // keep borders on the last row so the bottom grid line is visible
 }));
- 
+
 // map backend keys -> frontend labels (edit as you like)
 const PARAMETER_LABELS = {
   Temperature: 'Temperature',
@@ -127,10 +129,15 @@ const labelForParameter = (key) => {
 };
 
 function MeasurementsLive() {
-  {/* Filters */}
+  const [devices, setDevices] = React.useState([]);
+  const [locations, setLocations] = React.useState([]);
+  const [measurements, setMeasurements] = React.useState([]);
+
+  const [devicesServiceResponding, setDevicesServiceResponding] = React.useState(false);
+  const [measurementsServiceResponding, setMeasurementsServiceResponding] = React.useState(false);
+
+  {/* Filters */ }
   const [searchText, setSearchText] = React.useState('');
-  const [minDate, setMinDate] = React.useState(null);
-  const [maxDate, setMaxDate] = React.useState(null);
   const [dayFrom, setDayFrom] = React.useState(null);
   const [dayTo, setDayTo] = React.useState(null);
   const [order, setOrder] = React.useState('asc');
@@ -139,103 +146,193 @@ function MeasurementsLive() {
   // must match one of TablePagination rowsPerPageOptions (25, 50, 100)
   const [rowsPerPage, setRowsPerPage] = React.useState(25);
 
-  const [measurements, setMeasurements] = React.useState([]);
   const [open, setOpen] = React.useState(false);
   const [selectedDetails, setSelectedDetails] = React.useState(null);
   const [newIds, setNewIds] = React.useState([]);
   const [displayedIds, setDisplayedIds] = React.useState([]);
-  const [timeFrom, setTimeFrom] = React.useState(null);
-  const [timeTo, setTimeTo] = React.useState(null);
-  const [filterDialogOpen, setFilterDialogOpen] = React.useState(false);
-  const [devices, setDevices] = React.useState([]);
-  const [filterMode, setFilterMode] = React.useState('deviceNumber'); // 'deviceNumber' or 'deviceName'
+
+  const [appliedSettings, setAppliedSettings] = React.useState({
+    searchText: '',
+    dayTo: null,
+    dayFrom: null
+  });
+
+  const [FiltersAndSettingsChanged, setFiltersAndSettingsChanged] = React.useState(false);
+
+  const checkForChanges = React.useCallback(() => {
+    const currentSettings = {
+      searchText,
+      dayTo,
+      dayFrom
+    };
+
+
+    const hasChanges = JSON.stringify(currentSettings) !== JSON.stringify(appliedSettings);
+    setFiltersAndSettingsChanged(hasChanges);
+  }, [searchText, dayTo, dayFrom]);
+  React.useEffect(() => {
+    checkForChanges();
+  }, [checkForChanges]);
+
 
   // Liczba aktywnych filtrów
   const activeFiltersCount = React.useMemo(() => {
     let count = 0;
     if (dayFrom) count++;
     if (dayTo) count++;
-    if (timeFrom) count++;
-    if (timeTo) count++;
     return count;
-  }, [dayFrom, dayTo, timeFrom, timeTo]);
+  }, [dayFrom, dayTo]);
 
-  const HandleSearchChanged = (newSearchText) => {
-    setSearchText(newSearchText);
-  };
+  const getRowClassName = React.useCallback((params) => {
+    return newIds.includes(params.id) ? 'new-row' : '';
+  }, [newIds]);
 
   // Pobierz urządzenia na start
   const fetchDevices = React.useCallback(() => {
     fetch('https://localhost:6061/devices/all')
       .then(res => res.json())
-      .then(data => setDevices(data))
+      .then(data => { setDevices(data); })
       .catch(() => setDevices([]));
+  }, []);
+
+  const fetchLocations = React.useCallback(() => {
+    fetch('https://localhost:6061/devices/locations/all')
+      .then(res => res.json())
+      .then(data => { setLocations(data); })
+      .catch(() => setLocations([]));
   }, []);
 
   React.useEffect(() => {
     fetchDevices();
   }, [fetchDevices]);
 
-  // Obsługa websocket dla urządzeń (aktualizacja listy urządzeń)
   React.useEffect(() => {
-    const connection = new SignalR.HubConnectionBuilder()
+    fetchLocations();
+  }, [fetchLocations]);
+
+  //  ---------- SignalR - WebSockets ----------
+  React.useEffect(() => {
+    let connection = null;
+
+    connection = new SignalR.HubConnectionBuilder()
       .withUrl('https://localhost:6061/devicehub')
-      .withAutomaticReconnect()
       .configureLogging(SignalR.LogLevel.None)
+      .withAutomaticReconnect({
+        nextRetryDelayInMilliseconds: (retryContext) => {
+          return 5000;
+        }
+      })
       .build();
+
+    connection.onclose((error) => {
+      if (error) {
+        //console.log('[SIGNALR] Connection closed with error:', error);
+      } else {
+        //console.log('[SIGNALR] Connection closed gracefully');
+      }
+    });
+
+    connection.onreconnecting((error) => {
+      //console.log('[SIGNALR] Attempting to reconnect...');
+      setDevicesServiceResponding(false);
+    });
+
+    connection.onreconnected((connectionId) => {
+      //console.log('[SIGNALR] Reconnected successfully with connection ID:', connectionId);
+      setDevicesServiceResponding(true);
+    });
 
     connection.start()
       .then(() => {
-        connection.on('DeviceCreated', fetchDevices);
-        connection.on('DeviceDeleted', fetchDevices);
-        connection.on('DeviceUpdated', fetchDevices);
+        //console.log('[SIGNALR] Connected to ReportsHub successfully');
+        setDevicesServiceResponding(true);
+        connection.on('DeviceCreated', (deviceDto) => {
+
+        });
+        connection.on('DeviceUpdated', (deviceDto) => {
+
+        });
+        connection.on('DeviceStatusChanged', (deviceDto) => {
+
+        });
+        connection.on('DeviceDeleted', (deviceDto) => {
+
+        });
       })
-      .catch(() => {});
+      .catch((error) => {
+        //console.log('[SIGNALR] Failed to connect to ReportsHub:', error);
+        setDevicesServiceResponding(false);
+      });
 
     return () => {
-      connection.stop();
+      if (connection) {
+        //console.log('[SIGNALR] Disconnecting from ReportsHub...');
+        setDevicesServiceResponding(false);
+        connection.stop().catch((error) => {
+          //console.log('[SIGNALR] Error while disconnecting:', error);
+        });
+      }
     };
-  }, [fetchDevices]);
+  }, []);
 
-  // SignalR dla pomiarów
   React.useEffect(() => {
-    const connection = new SignalR.HubConnectionBuilder()
+    let connection = null;
+
+    connection = new SignalR.HubConnectionBuilder()
       .withUrl('https://localhost:6063/measurementhub')
-      .withAutomaticReconnect()
       .configureLogging(SignalR.LogLevel.None)
+      .withAutomaticReconnect({
+        nextRetryDelayInMilliseconds: (retryContext) => {
+          return 5000;
+        }
+      })
       .build();
+
+    connection.onclose((error) => {
+      if (error) {
+        //console.log('[SIGNALR] Connection closed with error:', error);
+      } else {
+        //console.log('[SIGNALR] Connection closed gracefully');
+      }
+    });
+
+    connection.onreconnecting((error) => {
+      //console.log('[SIGNALR] Attempting to reconnect...');
+      setMeasurementsServiceResponding(false);
+    });
+
+    connection.onreconnected((connectionId) => {
+      //console.log('[SIGNALR] Reconnected successfully with connection ID:', connectionId);
+      setMeasurementsServiceResponding(true);
+    });
 
     connection.start()
       .then(() => {
+        //console.log('[SIGNALR] Connected to ReportsHub successfully');
+        setMeasurementsServiceResponding(true);
         connection.on('MeasurementCreated', (createdMeasurementSet) => {
-          const dateObj = new Date(createdMeasurementSet.registerDate);
-          const device = devices.find(d => d.deviceNumber === createdMeasurementSet.deviceNumber);
-
-          console.log(`[MEASUREMENT CREATED] - ${JSON.stringify(createdMeasurementSet, null, 2)}`);
-
           setMeasurements(prev => [
             {
               id: createdMeasurementSet.id,
-              day: dayjs(dateObj).format('DD.MM.YYYY'),
-              hour: dayjs(dateObj).format('HH:mm:ss'),
+              date: dayjs(createdMeasurementSet.recordedAt).format('HH:mm:ss - DD MMMM YYYY'),
               deviceNumber: createdMeasurementSet.deviceNumber,
-              deviceName: device?.name || '',
-              location: device?.location.name || '',
+              deviceName: devices.find(x => x.deviceNumber === createdMeasurementSet.deviceNumber)?.name || '',
+              location: locations.find(x => x.id === createdMeasurementSet.locationID)?.name || '',
               details: Object.entries({
                 Temperature: createdMeasurementSet.temperature,
                 Humidity: createdMeasurementSet.humidity,
-                CO2: createdMeasurementSet.cO2,
-                VOC: createdMeasurementSet.voc,
+                CO2: createdMeasurementSet.carbonDioxide,
+                VOC: createdMeasurementSet.volatileOrganicCompounds,
                 ParticulateMatter1: createdMeasurementSet.particulateMatter1,
                 ParticulateMatter2v5: createdMeasurementSet.particulateMatter2v5,
                 ParticulateMatter10: createdMeasurementSet.particulateMatter10,
                 Formaldehyde: createdMeasurementSet.formaldehyde,
-                CO: createdMeasurementSet.co,
-                O3: createdMeasurementSet.o3,
+                CO: createdMeasurementSet.carbonMonoxide,
+                O3: createdMeasurementSet.ozone,
                 Ammonia: createdMeasurementSet.ammonia,
                 Airflow: createdMeasurementSet.airflow,
                 AirIonizationLevel: createdMeasurementSet.airIonizationLevel,
-                O2: createdMeasurementSet.o2,
+                O2: createdMeasurementSet.oxygen,
                 Radon: createdMeasurementSet.radon,
                 Illuminance: createdMeasurementSet.illuminance,
                 SoundLevel: createdMeasurementSet.soundLevel
@@ -248,102 +345,83 @@ function MeasurementsLive() {
           setNewIds(prev => [createdMeasurementSet.id, ...prev]);
         });
       })
-      .catch(() => {});
+      .catch((error) => {
+        //console.log('[SIGNALR] Failed to connect to ReportsHub:', error);
+        setMeasurementsServiceResponding(false);
+      });
 
     return () => {
-      connection.stop();
+      if (connection) {
+        //console.log('[SIGNALR] Disconnecting from ReportsHub...');
+        setMeasurementsServiceResponding(false);
+        connection.stop().catch((error) => {
+          //console.log('[SIGNALR] Error while disconnecting:', error);
+        });
+      }
     };
-  }, [devices]);
+  }, [devices, locations]);
 
-  const handleRequestSort = (event, property) => {
-    const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
-  };
+  // Debounce search to reduce filtering frequency
+  const debouncedSearch = useDebouncedCallback(
+    (value) => {
+      setSearchText(value);
+      setPage(0);
+    },
+    50 // 300ms delay
+  );
 
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
+  // Memoize pagination props
+  const paginationModel = React.useMemo(() => ({
+    page,
+    pageSize: rowsPerPage
+  }), [page, rowsPerPage]);
 
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(+event.target.value);
-    setPage(0);
-  };
-
-  const handleClearFilters = () => {
-    setTimeFrom(null);
-    setTimeTo(null);
-    setDayFrom(null);
-    setDayTo(null);
-    setSearchText('');
-    setPage(0);
-  };
-
-  const handleFilterModeChange = (event) => {
-    setFilterMode(event.target.value);
-  };
+  const handlePaginationChange = React.useCallback((model) => {
+    setPage(model.page);
+    setRowsPerPage(model.pageSize);
+  }, []);
 
   const filteredMeasurements = React.useMemo(() => {
-    // interpret user's picks as inclusive whole-day range
+    if (measurements.length === 0) return [];
+
+    const searchLower = searchText.toLowerCase();
+    const hasSearch = searchText.length > 0;
+    const hasDateFrom = dayFrom !== null;
+    const hasDateTo = dayTo !== null;
 
     return measurements.filter((row) => {
-      // build a full datetime from row.day + row.hour when available
-      let rowDate = null;
-      if (row.day && row.hour) {
-        rowDate = dayjs(
-          `${row.day} ${row.hour}`,
-          ['DD.MM.YYYY HH:mm:ss', 'DD.MM.YYYY HH:mm', 'YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DD HH:mm'],
-        );
-      } else if (row.day) {
-        rowDate = dayjs(row.day, ['DD.MM.YYYY', 'YYYY-MM-DD']);
-      }
-
-      // date range filtering (inclusive)
-      if (dayFrom || dayTo) {
-        if (!rowDate || !rowDate.isValid()) return false;
-        if (dayFrom && rowDate.isBefore(dayFrom)) return false;
-        if (dayTo && rowDate.isAfter(dayTo)) return false;
-      }
-
-      // time-of-day filtering (if you use selects/strings for timeFrom/timeTo)
-      if (timeFrom || timeTo) {
-        if (!row.hour) return false;
-        const rowTime = dayjs(row.hour, ['HH:mm:ss', 'HH:mm']);
-        if (!rowTime.isValid()) return false;
-        if (timeFrom) {
-          const tf = dayjs(timeFrom, ['HH:mm:ss', 'HH:mm']);
-          if (!tf.isValid()) return false;
-          if (rowTime.isBefore(tf)) return false;
-        }
-        if (timeTo) {
-          const tt = dayjs(timeTo, ['HH:mm:ss', 'HH:mm']);
-          if (!tt.isValid()) return false;
-          if (rowTime.isAfter(tt)) return false;
-        }
-      }
-
-      // searchText should match any of: location, deviceName, deviceNumber
-      if (searchText) {
-        const s = searchText.toLowerCase();
-        const matchesLocation = String(row.location ?? '').toLowerCase().includes(s);
-        const matchesDeviceName = String(row.deviceName ?? '').toLowerCase().includes(s);
-        const matchesDeviceNumber = String(row.deviceNumber ?? '').toLowerCase().includes(s);
+      // Early return for search text (most common filter)
+      if (hasSearch) {
+        const matchesLocation = String(row.location ?? '').toLowerCase().includes(searchLower);
+        const matchesDeviceName = String(row.deviceName ?? '').toLowerCase().includes(searchLower);
+        const matchesDeviceNumber = String(row.deviceNumber ?? '').toLowerCase().includes(searchLower);
         if (!matchesLocation && !matchesDeviceName && !matchesDeviceNumber) return false;
+      }
+
+      // Only parse dates if date filtering is active
+      if (hasDateFrom || hasDateTo) {
+        let rowDate = null;
+
+        // Parse the row date from the 'date' field (which contains formatted date like "HH:mm - DD MMMM YYYY")
+        if (row.date) {
+          // Try to parse the formatted date string
+          rowDate = dayjs(row.date, ['HH:mm - DD MMMM YYYY', 'DD.MM.YYYY HH:mm:ss', 'DD.MM.YYYY HH:mm', 'YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DD']);
+        }
+
+        // Date range filtering
+        if ((hasDateFrom || hasDateTo) && (!rowDate || !rowDate.isValid())) return false;
+
+        // Compare dates (ignoring time for date-only comparison)
+        if (hasDateFrom && rowDate.startOf('day').isBefore(dayFrom.startOf('day'))) return false;
+        if (hasDateTo && rowDate.startOf('day').isAfter(dayTo.startOf('day'))) return false;
       }
 
       return true;
     });
-  }, [measurements, timeFrom, timeTo, dayFrom, dayTo, searchText]);
+  }, [measurements, searchText, dayFrom, dayTo]);
 
-  const sortedRows = React.useMemo(
-    () =>
-      stableSort(filteredMeasurements, getComparator(order, orderBy))
-        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
-    [order, orderBy, page, rowsPerPage, filteredMeasurements, searchText]
-  );
-
-  const handleRowClick = (details, id) => {
-    setSelectedDetails(details);
+  const handleRowClick = (details, id, rowData) => {
+    setSelectedDetails({ details, rowData });
     setOpen(true);
     // mark as no longer "new"
     setNewIds(prev => prev.filter(newId => newId !== id));
@@ -360,8 +438,6 @@ function MeasurementsLive() {
   React.useEffect(() => {
     if (!measurements || measurements.length === 0) {
       // no measurements -> clear range and the From/To values
-      setMinDate(null);
-      setMaxDate(null);
       setDayFrom(null);
       setDayTo(null);
       return;
@@ -377,8 +453,6 @@ function MeasurementsLive() {
       .filter((d) => d.isValid());
 
     if (dates.length === 0) {
-      setMinDate(null);
-      setMaxDate(null);
       return;
     }
 
@@ -417,310 +491,706 @@ function MeasurementsLive() {
     setDisplayedIds((prev) => prev.filter((n) => n !== id));
   };
 
+  const ClearSortFilter_ButtonClick = () => {
+    setSearchText('');
+    setDayTo(null);
+    setDayFrom(null);
+
+    const stxt = document.getElementById('measurement-search-input');
+    stxt.value = '';
+
+    const defaultSettings = {
+      searchText: '',
+      dayTo: null,
+      dayFrom: null,
+    };
+
+    setAppliedSettings(defaultSettings);
+    setFiltersAndSettingsChanged(false);
+  };
+
+
+  // Move this outside the component or memoize properly
+  const dataGridColumns = React.useMemo(() => [
+    {
+      field: 'status',
+      headerName: 'Status',
+      minWidth: 120,
+      sortable: false,
+      headerAlign: 'left',
+      align: 'left',
+      renderCell: (params) => {
+        if (newIds.includes(params.row.id)) {
+          return (
+            <Box component="span" sx={(theme) => ({
+              display: 'inline-flex',
+              alignItems: 'center',
+              px: 1.2, py: 0.4,
+              borderRadius: '999px',
+              bgcolor: theme.palette.primary.main,
+              color: theme.palette.primary.contrastText,
+              fontSize: '0.75rem',
+              fontWeight: 700,
+            })}>
+              <Typography variant='subtitle2'>New</Typography>
+            </Box>
+          );
+        } else if (displayedIds.includes(params.row.id)) {
+          return (
+            <Box component="span" sx={(theme) => ({
+              display: 'inline-flex',
+              alignItems: 'center',
+              px: 1.2, py: 0.4,
+              borderRadius: '999px',
+              bgcolor: theme.palette.action.disabledBackground,
+              color: theme.palette.text.primary,
+              fontSize: '0.75rem',
+              fontWeight: 500,
+            })}>
+              <Typography variant='subtitle2'>Displayed</Typography>
+            </Box>
+          );
+        }
+        return null;
+      }
+    },
+    {
+      field: 'deviceName',
+      headerName: 'Device Name',
+      minWidth: 200,
+      flex: 1,
+      headerAlign: 'right',
+      align: 'right',
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexDirection: 'row-reverse' }}>
+          <Typography variant='subtitle2'>{params.value || '-'}</Typography>
+          <Box sx={{
+            opacity: 0,
+            transition: 'opacity 0.2s ease',
+            '.MuiDataGrid-row:hover &': { opacity: 1 }
+          }}>
+            <Tooltip title="Copy to clipboard">
+              <IconButton
+                size='small'
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(params.value);
+                }}
+              >
+                <CopyAllIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+      )
+    },
+    {
+      field: 'date',
+      headerName: 'Date',
+      minWidth: 200,
+      flex: 1,
+      headerAlign: 'left',
+      align: 'left',
+    },
+    {
+      field: 'location',
+      headerName: 'Location',
+      minWidth: 200,
+      headerAlign: 'right',
+      flex: 1,
+      align: 'right',
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'flex-end' }}>
+          {params.value && (
+            <Box sx={{
+              opacity: 0,
+              transition: 'opacity 0.2s ease',
+              '.MuiDataGrid-row:hover &': { opacity: 1 }
+            }}>
+              <Tooltip title="Copy to clipboard">
+                <IconButton
+                  size='small'
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(params.value);
+                  }}
+                >
+                  <CopyAllIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          )}
+          <Typography variant='subtitle2'>{params.value || '-'}</Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'deviceNumber',
+      headerName: 'Device Number',
+      minWidth: 350,
+      headerAlign: 'left',
+      flex: 1,
+      align: 'left',
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant='subtitle2'>{params.value || '-'}</Typography>
+          {params.value && (
+            <Box sx={{
+              opacity: 0,
+              transition: 'opacity 0.2s ease',
+              '.MuiDataGrid-row:hover &': { opacity: 1 }
+            }}>
+              <Tooltip title="Copy to clipboard">
+                <IconButton
+                  size='small'
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(params.value);
+                  }}
+                >
+                  <CopyAllIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          )}
+        </Box>
+      )
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      minWidth: 120,
+      maxWidth: 120,
+      width: 120,
+      headerAlign: 'right',
+      flex: 1,
+      sortable: false,
+      align: 'center',
+      renderCell: (params) => (
+        <Box sx={{
+          display: 'flex',
+          alignContent: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          alignItems: 'center',
+          gap: 1,
+          opacity: 0,
+          transition: 'opacity 0.2s ease',
+          '.MuiDataGrid-row:hover &': { opacity: 1 }
+        }}>
+          <Tooltip title="Details">
+            <IconButton
+              size='small'
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRowClick(params.row.details, params.row.id, params.row);
+              }}
+              sx={(theme) => ({
+                color: theme.palette.custompalette.royalblue,
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.custompalette.royalblue, 0.12),
+                }
+              })}
+            >
+              <InfoOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Hide">
+            <IconButton
+              size='small'
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteMeasurement(params.row.id);
+              }}
+              sx={(theme) => ({
+                backgroundColor: 'transparent',
+                color: theme.palette.custompalette.indianred,
+                transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.custompalette.indianred, 0.12),
+                  color: theme.palette.custompalette.indianred,
+                },
+                '&:active': {
+                  backgroundColor: alpha(theme.palette.custompalette.indianred, 0.18),
+                },
+                '&:disabled': {
+                  opacity: 0.3,
+                  cursor: 'not-allowed',
+                  color: theme.palette.action.disabled
+                }
+              })}
+            >
+              <VisibilityOffOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )
+    }
+  ], [newIds, displayedIds]);
+
+  const HideAllSelectedRows_ButtonClick = () => {
+    if (rowSelectionModel.type === 'exclude' && rowSelectionModel.ids.size !== 0) {
+      //  Delete not excluded - keep only the excluded ones
+      const excludedIds = Array.from(rowSelectionModel.ids);
+      setMeasurements((prev) => prev.filter((m) => excludedIds.includes(m.id)));
+      setNewIds((prev) => prev.filter((id) => excludedIds.includes(id)));
+      setDisplayedIds((prev) => prev.filter((id) => excludedIds.includes(id)));
+    }
+    else if (rowSelectionModel.type === 'exclude' && rowSelectionModel.ids.size === 0) {
+      //Delete all - no exclusions means delete everything
+      setMeasurements([]);
+      setNewIds([]);
+      setDisplayedIds([]);
+    }
+    else if (rowSelectionModel.type === 'include' && rowSelectionModel.ids.size !== 0) {
+      //  Drop selected
+      const selectedIds = Array.from(rowSelectionModel.ids);
+      setMeasurements((prev) => prev.filter((m) => !selectedIds.includes(m.id)));
+      setNewIds((prev) => prev.filter((id) => !selectedIds.includes(id)));
+      setDisplayedIds((prev) => prev.filter((id) => !selectedIds.includes(id)));
+    }
+
+    // Clear selection after hiding
+    setRowSelectionModel({
+      type: 'include',
+      ids: new Set(),
+    });
+  };
+
+  const [rowSelectionModel, setRowSelectionModel] = React.useState({
+    type: 'include',
+    ids: new Set(),
+  });
+
   return (
-    <Box sx={{ 
-      width: '100%', 
-      height: '100%', 
-      display: 'flex', 
+    <Box sx={{
+      width: '100%',
+      height: '100%',
+      display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden'
     }}>
 
       {/* Search and filtering */}
-      <Paper>
-        <Box sx={{ display: 'flex', gap: 1, mt: 1, mb: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-            <TextField
-              label="Search"
-              variant="outlined"
-              size="small"
-              id="measurement-search-input"
-              sx={{ minWidth: 300 }}
-              onChange={(e) => {
-                HandleSearchChanged(e.target.value);
-                setPage(0); // reset pagination so new filter is immediately visible
-              }}
-            />
-          <Badge
-            color="primary"
-            badgeContent={activeFiltersCount > 0 ? activeFiltersCount : null}
-            sx={{ '& .MuiBadge-badge': { fontSize: 12, padding: '0 6px' } }}>
-            <IconButton onClick={() => setFilterDialogOpen(true)}>
-              <FilterListIcon />
-            </IconButton>
-          </Badge>
-        </Box>
-      </Paper>
-      
-      {/* Divider */}
-      <Divider />
+      <Paper sx={{ display: 'flex', m: 1, justifyContent: 'space-between', flexWrap: 'wrap', flexDirection: 'column' }}>
 
-      {/* Table and pagination content */}
-      <Paper sx={{ 
-        flexGrow: 1, 
-        display: 'flex', 
-        flexDirection: 'column',
-        overflow: 'hidden',
-        position: 'relative'
-      }}>
-        <TableContainer sx={{ flexGrow: 1, overflow: 'auto', minHeight: 0 }}>
-          <Collapse in={filteredMeasurements.length === 0} timeout={300} unmountOnExit>
-            <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 3 }}>
-              <Paper elevation={0} sx={{ width: '100%', textAlign: 'center', py: 6, bgcolor: 'transparent' }}>
-                <SearchOffIcon sx={{ fontSize: 64, color: 'action.disabled', mb: 1 }} />
-                <Typography variant="h6">No measurements found!</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  If you have just started the system, please wait a moment for measurements to arrive.
-                </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap', flexDirection: 'row' }}>
+
+          <Box sx={{ gap: 0, m: 1 }}>
+            <Typography fontWeight='bold' variant='h5'>Live Measurements</Typography>
+            <Typography variant='subtitle2' sx={{ color: (theme) => theme.palette.custompalette.airsuperiorityblue }}>View all of currently captured measurements with live feed!</Typography>
+          </Box>
+
+          <Box sx={{ gap: 0, m: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <Typography variant='subtitle1'>Active Devices</Typography>
+              <Tooltip title={"Current count of devices that are capturing data. Their status is Online."}>
+                <InfoOutlinedIcon sx={{ color: (theme) => theme.palette.custompalette.royalblue, fontSize: 18 }}></InfoOutlinedIcon>
+              </Tooltip>
+            </Box>
+
+            {devicesServiceResponding === false ? (
+              <Skeleton variant="text" height={28} width={150} sx={{ borderRadius: 1 }} />
+            ) : devices.length === 0 ? (
+              <Typography variant='subtitle1' sx={{ color: (theme) => theme.palette.custompalette.rustyred }}>
+                There are no devices in the system!
+              </Typography>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.4 }}>
+
+                {/* i/j devices */}
+                <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.3 }}>
+                  <Typography fontWeight='bold' variant='subtitle1' sx={{ color: (theme) => theme.palette.custompalette.persiangreen }}>
+                    {devices.filter(device => device.status.type === 'Online').length}
+                  </Typography>
+                  <Typography variant='subtitle1' sx={{ color: (theme) => theme.palette.custompalette.airsuperiorityblue }}>
+                    /
+                  </Typography>
+                  <Typography fontWeight='bold' variant='subtitle1' sx={{ color: (theme) => theme.palette.custompalette.airsuperiorityblue }}>
+                    {devices.length}
+                  </Typography>
+                </Box>
+
+                {/* % of active devices */}
+                <Box sx={{ display: 'flex', alignItems: 'center', flexDirection: 'row', gap: 0 }}>
+                  <Typography variant='subtitle2' sx={{ color: (theme) => theme.palette.custompalette.airsuperiorityblue }}>
+                    (
+                  </Typography>
+                  <Typography variant='subtitle2' sx={{ color: (theme) => theme.palette.custompalette.airsuperiorityblue }}>
+                    {Math.round(devices.filter(device => device.status.type === 'Online').length * 100 / devices.length)}
+                  </Typography>
+                  <Typography variant='subtitle2' sx={{ color: (theme) => theme.palette.custompalette.airsuperiorityblue }}>
+                    % percent active)
+                  </Typography>
+                </Box>
+              </Box>)}
+          </Box>
+        </Box>
+
+        <Paper sx={{ display: 'flex', m: 1, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Badge
+              variant="dot"
+              invisible={!searchText}
+              sx={{
+                '& .MuiBadge-dot': {
+                  backgroundColor: (theme) => theme.palette.custompalette.maize
+                }
+              }}>
+              <TextField
+                label="Search"
+                variant="outlined"
+                //value={searchText}
+                size="small"
+                id="measurement-search-input"
+                sx={{ minWidth: 300 }}
+                onChange={(e) => debouncedSearch(e.target.value)}
+              />
+            </Badge>
+
+            <Box>
+              <Paper sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  {/* From picker (disabled while no measurements). min/max prevent selecting outside available range */}
+                  <Badge
+                    variant="dot"
+                    invisible={!dayFrom}
+                    sx={{
+                      '& .MuiBadge-dot': {
+                        backgroundColor: (theme) => theme.palette.custompalette.maize
+                      }
+                    }}>
+
+                    <DatePicker
+                      label="From"
+                      variant="outlined"
+                      size="medium"
+                      //disabled={!serverResponding || isLoading}
+                      value={dayFrom}
+                      onChange={(v) => { setDayFrom(v); setPage(0); }}
+                      clearable
+                      slotProps={{
+                        textField: { size: 'small', variant: 'outlined' },
+                        actionBar: {
+                          actions: ['clear']
+                        }
+                      }}
+                      maxDate={dayTo || undefined}
+                    />
+                  </Badge>
+
+                  {/* To picker */}
+                  <Badge
+                    variant="dot"
+                    invisible={!dayTo}
+                    sx={{
+                      '& .MuiBadge-dot': {
+                        backgroundColor: (theme) => theme.palette.custompalette.maize
+                      }
+                    }}>
+
+                    <DatePicker
+                      label="To"
+                      variant="outlined"
+                      size="medium"
+                      //disabled={!serverResponding || isLoading}
+                      value={dayTo}
+                      onChange={(v) => { setDayTo(v); setPage(0); }}
+                      clearable
+                      slotProps={{
+                        textField: { size: 'small', variant: 'outlined' },
+                        actionBar: {
+                          actions: ['clear']
+                        }
+                      }}
+                      maxDate={dayFrom || undefined}
+                    />
+                  </Badge>
+                </LocalizationProvider>
               </Paper>
             </Box>
-          </Collapse>
+          </Box>
 
-          <Collapse in={filteredMeasurements.length > 0} timeout={400} unmountOnExit>
-            <Table stickyHeader aria-label="measurements table">
-              <TableHead>
-                <TableRow>
-                  <TableCell
-                    sx={(theme) => ({
-                      minWidth: 10,
-                      maxWidth: 40,
-                      textAlign: 'center',
-                      fontWeight: 'bold',
-                      px: 1,
-                    })}
-                  >
-                    Index
-                  </TableCell>
-                  <TableCell style={{ minWidth: 80, fontWeight: 'bold', textAlign: 'center' }}>
-                    Status
-                  </TableCell>
-                  {columns.map((column) => (
-                    <TableCell
-                      key={column.id}
-                      style={{ minWidth: column.minWidth, fontWeight: 'bold' }}
-                      sortDirection={orderBy === column.id ? order : false}
-                    >
-                      <TableSortLabel
-                        active={orderBy === column.id}
-                        direction={orderBy === column.id ? order : 'asc'}
-                        onClick={(event) => handleRequestSort(event, column.id)}
-                      >
-                        {column.label}
-                      </TableSortLabel>
-                    </TableCell>
-                  ))}
-                  <TableCell
-                    sx={(theme) => ({
-                      minWidth: 40,
-                      maxWidth: 40,
-                      textAlign: 'center',
-                      fontWeight: 'bold',
-                      borderLeft: `1px solid ${theme.palette.divider}` // vertical separator before Actions
-                    })}
-                  >
-                    Actions
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {sortedRows.map((row, idx) => {
-                  const tableIndex = page * rowsPerPage + idx + 1;
-                  return (
-                    <TableRow
-                      hover
-                      tabIndex={-1}
-                      key={row.id}
-                      onClick={() => handleRowClick(row.details, row.id)}
-                      sx={{ cursor: 'pointer' }}
-                    >
-                      <TableCell sx={{ pr: 1, textAlign: 'center' }}>
-                        <span>{tableIndex}</span>
-                      </TableCell>
-                      <TableCell sx={{ pr: 1, textAlign: 'center' }}>
-                        {newIds.includes(row.id) ? (
-                          <Box
-                            component="span"
-                            sx={(theme) => ({
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              px: 1.2,
-                              py: 0.4,
-                              borderRadius: '999px',
-                              bgcolor: theme.palette.primary.main,
-                              color: theme.palette.primary.contrastText,
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                            })}
-                          >
-                            New
-                          </Box>
-                        ) : displayedIds.includes(row.id) ? (
-                          <Box
-                            component="span"
-                            sx={(theme) => ({
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              px: 1.2,
-                              py: 0.4,
-                              borderRadius: '999px',
-                              bgcolor: theme.palette.action.disabledBackground,
-                              color: theme.palette.text.primary,
-                              fontSize: '0.75rem',
-                              fontWeight: 500,
-                            })}
-                          >
-                            Displayed
-                          </Box>
-                        ) : null}
-                      </TableCell>
-                      {columns.map((column) => (
-                        <TableCell key={column.id}>
-                          {typeof row[column.id] === 'object' && row[column.id] !== null
-                            ? JSON.stringify(row[column.id])
-                            : row[column.id] ?? ''}
-                        </TableCell>
-                      ))}
-                      <TableCell
-                        sx={(theme) => ({
-                          pr: 1,
-                          textAlign: 'center',
-                          borderLeft: `1px solid ${theme.palette.divider}` // vertical separator
-                        })}
-                      >
-                        <IconButton
-                          size="small"
-                          color="error"
-                          sx={(theme) => ({
-                            backgroundColor: 'transparent',
-                            color: theme.palette.error.main,
-                            transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
-                            '&:hover': {
-                              backgroundColor: alpha(theme.palette.error.main, 0.12),
-                              color: theme.palette.error.dark,
-                            },
-                            '&:active': {
-                              backgroundColor: alpha(theme.palette.error.main, 0.18),
-                            },
-                          })}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteMeasurement(row.id);
-                          }}
-                        >
-                          <VisibilityOffIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Refresh button */}
+            <Tooltip title={"Hide selected measurements"}>
+              <span>
 
-                {/* Puste wiersze dla stałej wysokości */}
-                {sortedRows.length < rowsPerPage && Array.from({ length: rowsPerPage - sortedRows.length }).map((_, i) => (
-                  <TableRow key={`empty-${i}`} style={{ height: 53 }}>
-                    <TableCell />{/* Index */}
-                    <TableCell />{/* Status */}
-                    {columns.map((column) => (
-                      <TableCell key={column.id} />
-                    ))}
-                    <TableCell sx={(theme) => ({ borderLeft: `1px solid ${theme.palette.divider}` })} />{/* Actions (last) */}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Collapse>
-        </TableContainer>
+                <IconButton
+                  size='medium'
+                  disabled={!(rowSelectionModel.type === 'exclude' || rowSelectionModel.ids.size !== 0)}
+                  onClick={HideAllSelectedRows_ButtonClick}
+                  sx={(theme) => ({
+                    backgroundColor: 'transparent',
+                    color: theme.palette.custompalette.indianred,
+                    transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.custompalette.indianred, 0.12),
+                      color: theme.palette.custompalette.indianred,
+                    },
+                    '&:active': {
+                      backgroundColor: alpha(theme.palette.custompalette.indianred, 0.18),
+                    },
+                    '&:disabled': {
+                      opacity: 0.3,
+                      cursor: 'not-allowed',
+                      color: theme.palette.action.disabled
+                    }
+                  })}
+                >
+                  <VisibilityOffOutlinedIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
 
-      <Divider/>
-
-      {/* Pagination */}
-       <TablePagination
-         rowsPerPageOptions={[25, 50, 100]}
-         component="div"
-         count={filteredMeasurements.length}
-         rowsPerPage={rowsPerPage}
-         page={page}
-         onPageChange={handleChangePage}
-         onRowsPerPageChange={handleChangeRowsPerPage}
-         sx={{ 
-           flexShrink: 0,  // prevent pagination from shrinking
-         }}
-       />
+            {/* Clear button */}
+            <Tooltip
+              title={"Clear filters"}
+            >
+              <span>
+                <IconButton
+                  disabled={!measurementsServiceResponding || !FiltersAndSettingsChanged}
+                  size='medium'
+                  onClick={ClearSortFilter_ButtonClick}
+                  sx={(theme) => ({
+                    backgroundColor: 'transparent',
+                    color: theme.palette.custompalette.indianred,
+                    transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.custompalette.indianred, 0.12),
+                      color: theme.palette.custompalette.indianred,
+                    },
+                    '&:active': {
+                      backgroundColor: alpha(theme.palette.custompalette.indianred, 0.18),
+                    },
+                    '&:disabled': {
+                      opacity: 0.3,
+                      cursor: 'not-allowed',
+                      color: theme.palette.action.disabled
+                    }
+                  })}
+                >
+                  <DeleteSweepOutlinedIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        </Paper>
       </Paper>
 
-      {/* Okno dialogowe z filtrami */}
-      <Dialog open={filterDialogOpen} onClose={() => setFilterDialogOpen(false)} maxWidth="md">
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', padding: 2, paddingLeft: 2, paddingRight: 2 }}>
-          <Box component="span">Filters</Box>
-          <IconButton
-            aria-label="close"
-            onClick={() => setFilterDialogOpen(false)}
-            sx={(theme) => ({ ml: 'auto' })}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <Divider />
+      {/* Divider */}
+      {/* <Divider /> */}
 
-        <DialogContent sx={{ padding: 2}}>
-          <Box>
-            <Paper sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                {/* From picker (disabled while no measurements). min/max prevent selecting outside available range */}
-                <DateTimePicker
-                  label="From"
-                  value={dayFrom ?? null}
-                  onChange={(v) => {
-                    // normalize picker output to a dayjs instance or null
-                    setDayFrom(v ? dayjs(v) : null);
-                    setPage(0); // apply filter immediately
-                  }}
-                   minDateTime={minDate ?? undefined}
-                   maxDateTime={maxDate ?? undefined}
-                   disabled={!minDate || !maxDate}
-                   inputFormat="DD.MM.YYYY HH:mm:ss"         // show DD.MM.YYYY with seconds
-                   views={['day','month','year','hours','minutes']}
-                   minutesStep={5} // allow selecting only 5-minute intervals
-                   ampm={false}
-                   slotProps={{
-                     textField: {
-                       size: 'small',
-                       variant: 'outlined',
-                       helperText: !minDate ? 'No measurements available' : "Select start date"
-                     }
-                   }}
-                 />
 
-                 {/* To picker */}
-                 <DateTimePicker
-                   label="To"
-                   value={dayTo ?? null}
-                   onChange={(v) => {
-                     // normalize picker output to a dayjs instance or null
-                     setDayTo(v ? dayjs(v) : null);
-                     setPage(0); // apply filter immediately
-                   }}
-                   minDateTime={minDate ?? undefined}
-                   maxDateTime={maxDate ?? undefined}
-                   disabled={!minDate || !maxDate}
-                   inputFormat="DD.MM.YYYY HH:mm:ss"
-                   views={['year','month','day','hours','minutes']}
-                   minutesStep={5}
-                   ampm={false}
-                   slotProps={{
-                     textField: {
-                       size: 'small',
-                       variant: 'outlined',
-                       helperText: !maxDate ? 'No measurements available' : "Select end date"
-                     }
-                   }}
-                 />
-              </LocalizationProvider>
-            </Paper>
+      <Box sx={{
+        flexGrow: 1,
+        overflow: 'auto',
+        ml: 2,
+        mr: 2,
+        minHeight: 0,
+        display: 'flex',
+        position: 'relative'
+      }}>
+
+        {/* Server not reponding! */}
+        <Fade
+          in={!measurementsServiceResponding}
+          timeout={{ enter: 600, exit: 300 }}
+          unmountOnExit
+        >
+          <Box sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            alignContent: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            width: '100%',
+            height: '100%'
+          }}>
+            <InfoLabel
+              mainlabel="Measurements service is not responding"
+              icon={WifiOffOutlinedIcon}
+              description={"This service is not responding right now, try again later."}
+            />
           </Box>
-        </DialogContent>
-        <DialogActions sx={{ margin: 1 }}>
-          <Button onClick={handleClearFilters} variant="outlined" startIcon={<DeleteIcon />}>Clear</Button>
-        </DialogActions>
-      </Dialog>
+        </Fade>
+
+        {/* System responding but no measurements in the system! */}
+        <Fade
+          in={measurementsServiceResponding && measurements.length === 0}
+          timeout={{ enter: 600, exit: 300 }}
+          unmountOnExit
+        >
+          <Box sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            alignContent: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            width: '100%',
+            height: '100%'
+          }}>
+            <LoadingLabel
+              mainlabel="Waiting for new measurements..."
+              icon={CloudOutlinedIcon}
+              description={"Waiting for devices to create new measurement"}
+            />
+          </Box>
+        </Fade>
+
+        {/* System responding but no measurements for this filters! */}
+        <Fade
+          in={measurementsServiceResponding && measurements.length > 0 && filteredMeasurements.length === 0}
+          timeout={{ enter: 600, exit: 300 }}
+          unmountOnExit
+        >
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              alignContent: 'center',
+              justifyContent: 'center',
+              flexDirection: 'column',
+              width: '100%',
+              height: '100%'
+            }}
+          >
+            <InfoLabel
+              mainlabel="No measurements found!"
+              icon={CloudOffOutlinedIcon}
+              description={"No measurements match your current filters. Try modifying the search criteria or clearing filters to see more results."}
+            />
+          </Box>
+        </Fade>
+
+        {/* System responding */}
+        <Fade
+          in={measurementsServiceResponding && measurements.length > 0 && filteredMeasurements.length > 0}
+          timeout={{ enter: 600, exit: 300 }}
+          unmountOnExit
+        >
+          <DataGrid
+            rows={filteredMeasurements}
+            columns={dataGridColumns}
+            paginationModel={paginationModel}
+            onPaginationModelChange={handlePaginationChange}
+            checkboxSelection
+            disableSelectionOnClick
+            disableColumnMenu={false}
+            disableColumnSelector={true}
+            disableColumnFilter={false}
+            disableColumnReorder={true}
+            onRowSelectionModelChange={(newRowSelectionModel) => {
+              setRowSelectionModel(newRowSelectionModel);
+            }}
+            rowSelectionModel={rowSelectionModel}
+            disableColumnResize={false}
+            sortingOrder={['asc', 'desc']}
+            onSortModelChange={(model) => {
+              if (model.length > 0) {
+                setOrder(model[0].sort);
+                setOrderBy(model[0].field);
+              }
+            }}
+            sx={{
+              height: '100%',
+              border: 'none',
+              backgroundColor: (theme) => theme.palette.custompalette.richblack,
+              '& .MuiDataGrid-cell': {
+                borderBottom: 'none',
+                border: 'none',
+                backgroundColor: (theme) => theme.palette.custompalette.richblack,
+              },
+              '& .MuiDataGrid-columnHeaders': {
+                borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+                backgroundColor: (theme) => theme.palette.custompalette.richblack,
+                border: 'none',
+                '& .MuiDataGrid-columnHeader': {
+                  backgroundColor: (theme) => theme.palette.custompalette.richblack,
+                },
+              },
+              '& .MuiDataGrid-row': {
+                backgroundColor: (theme) => theme.palette.custompalette.airsuperiorityblue,
+                '&:hover': {
+                  backgroundColor: (theme) => alpha(theme.palette.custompalette.airsuperiorityblue, 0.05),
+                  '& .MuiDataGrid-cell': {
+                    backgroundColor: (theme) => alpha(theme.palette.custompalette.airsuperiorityblue, 0.05),
+                  }
+                },
+                '&.Mui-selected': {
+                  backgroundColor: (theme) => alpha(theme.palette.custompalette.airsuperiorityblue, 0.1),
+                  '& .MuiDataGrid-cell': {
+                    backgroundColor: (theme) => alpha(theme.palette.custompalette.airsuperiorityblue, 0.1),
+                  },
+                  '&:hover': {
+                    backgroundColor: (theme) => alpha(theme.palette.custompalette.airsuperiorityblue, 0.15),
+                    '& .MuiDataGrid-cell': {
+                      backgroundColor: (theme) => alpha(theme.palette.custompalette.airsuperiorityblue, 0.15),
+                    }
+                  },
+                },
+              },
+              '& .new-row': {
+                backgroundColor: (theme) => alpha(theme.palette.custompalette.richblack, 1),
+                border: 'none',
+                '& .MuiDataGrid-cell': {
+                  backgroundColor: (theme) => alpha(theme.palette.custompalette.richblack, 1),
+                },
+                '&:hover': {
+                  backgroundColor: (theme) => alpha(theme.palette.custompalette.airsuperiorityblue, 0.05),
+                  '& .MuiDataGrid-cell': {
+                    backgroundColor: (theme) => alpha(theme.palette.custompalette.airsuperiorityblue, 0.05),
+                  }
+                },
+                '&.Mui-selected': {
+                  backgroundColor: (theme) => alpha(theme.palette.custompalette.airsuperiorityblue, 0.1),
+                  '& .MuiDataGrid-cell': {
+                    backgroundColor: (theme) => alpha(theme.palette.custompalette.airsuperiorityblue, 0.1),
+                  },
+                  '&:hover': {
+                    backgroundColor: (theme) => alpha(theme.palette.custompalette.airsuperiorityblue, 0.15),
+                    '& .MuiDataGrid-cell': {
+                      backgroundColor: (theme) => alpha(theme.palette.custompalette.airsuperiorityblue, 0.15),
+                    }
+                  },
+                },
+              },
+              '& .MuiDataGrid-footerContainer': {
+                backgroundColor: (theme) => theme.palette.custompalette.richblack,
+              },
+              '& .MuiDataGrid-root': {
+                border: 'none',
+              },
+              '& .MuiDataGrid-main': {
+                backgroundColor: (theme) => theme.palette.custompalette.richblack,
+              },
+              '& .MuiDataGrid-virtualScroller': {
+                backgroundColor: (theme) => theme.palette.custompalette.richblack,
+              },
+              '& .MuiDataGrid-overlay': {
+                backgroundColor: (theme) => theme.palette.custompalette.richblack,
+              }
+            }}
+            getRowClassName={getRowClassName}
+          />
+        </Fade>
+      </Box>
 
       {/* Okno dialogowe ze szczegółami pomiaru */}
       <Dialog
@@ -728,10 +1198,23 @@ function MeasurementsLive() {
         onClose={handleClose}
         maxWidth="sm"
         fullWidth
+                        aria-labelledby="measurement-details-dialog-title"
+                aria-describedby="measurement-details-dialog-description"
+                slotProps={{
+                    paper: {
+                        sx: {
+                            border: '0.01rem solid',
+                            borderColor: (theme) => theme.palette.customgray?.light,
+                            borderRadius: 2,
+                        }
+                    }
+                }}
         TransitionProps={{ onExited: () => setSelectedDetails(null) }}
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', padding: 1, paddingLeft: 2 }}>
-          <Box component="span">Details</Box>
+          <Box component="span">
+            <Typography variant='h6'>Measurement details</Typography>
+          </Box>
           <IconButton
             aria-label="close"
             onClick={handleClose}
@@ -742,42 +1225,38 @@ function MeasurementsLive() {
         </DialogTitle>
         <Divider />
 
-        <DialogContent sx={{ px: 2, py: 1 }}>
-          {selectedDetails ? (
-            <TableContainer
-              component={Paper}
-              sx={(theme) => ({
-                border: `1px solid ${theme.palette.divider}`,
-                borderRadius: 1,
-                maxHeight: '60vh',
-                overflow: 'auto',
-              })}
-            >
-              <Table size="small" aria-label="details table" stickyHeader sx={{ borderCollapse: 'collapse', width: '100%' }}>
-                 <TableHead>
-                   <TableRow>
-                     <StyledTableCell>Parameter</StyledTableCell>
-                     <StyledTableCell align="right">Value</StyledTableCell>
-                   </TableRow>
-                 </TableHead>
-                 <TableBody>
-                   {Object.entries(selectedDetails).map(([key, value]) => (
-                     <StyledTableRow key={key}>
-                       <StyledTableCell component="th" scope="row">
-                         {labelForParameter(key)}
-                       </StyledTableCell>
-                       <StyledTableCell align="right">
-                         {value?.value ?? ''}{value?.unit ? ` ${value.unit}` : ''}
-                       </StyledTableCell>
-                     </StyledTableRow>
-                   ))}
-                 </TableBody>
-               </Table>
-             </TableContainer>
-           ) : (
-             <Typography color="text.secondary">Brak szczegółowych danych.</Typography>
-           )}
-         </DialogContent>
+        <DialogContent sx={{ px: 2, py: 1, height: 500}}>
+            {selectedDetails && (
+              <MeasurementDetailsTable
+                date={selectedDetails.rowData?.date || 'Unknown'}
+                device={{
+                  id: selectedDetails.rowData?.deviceNumber || 'Unknown',
+                  name: selectedDetails.rowData?.deviceName || 'Unknown'
+                }}
+                location={{
+                  id: 'Unknown', // Add locationId to your data structure if available
+                  name: selectedDetails.rowData?.location || 'Unknown'
+                }}
+                temperature={selectedDetails.details?.Temperature || null}
+                humidity={selectedDetails.details?.Humidity || null}
+                co2={selectedDetails.details?.CO2 || null}
+                voc={selectedDetails.details?.VOC || null}
+                pm1={selectedDetails.details?.ParticulateMatter1 || null}
+                pm25={selectedDetails.details?.ParticulateMatter2v5 || null}
+                p10={selectedDetails.details?.ParticulateMatter10 || null}
+                formaldehyde={selectedDetails.details?.Formaldehyde || null}
+                co={selectedDetails.details?.CO || null}
+                o3={selectedDetails.details?.O3 || null}
+                ammonia={selectedDetails.details?.Ammonia || null}
+                airflow={selectedDetails.details?.Airflow || null}
+                ail={selectedDetails.details?.AirIonizationLevel || null}
+                o2={selectedDetails.details?.O2 || null}
+                radon={selectedDetails.details?.Radon || null}
+                illuminance={selectedDetails.details?.Illuminance || null}
+                soundlevel={selectedDetails.details?.SoundLevel || null}
+              />
+            )}
+        </DialogContent>
       </Dialog>
     </Box>
   );
