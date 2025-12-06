@@ -1,12 +1,9 @@
 import React from 'react';
 import Bulb from '../components/Bulb'
-import { Box, IconButton, Typography, Button, Stack, ButtonGroup, Grid, Divider, Snackbar, Alert, CircularProgress, LinearProgress, SpeedDial, SpeedDialAction, MenuItem, Select, FormControl, InputLabel, Collapse, Tabs, Tab, ListItemText, Menu, Icon, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
+import { Box, IconButton, Typography, Button, Stack, ButtonGroup, Grid, Divider, Snackbar, Alert, CircularProgress, LinearProgress, SpeedDial, SpeedDialAction, MenuItem, Select, FormControl, InputLabel, Collapse, Tabs, Tab, ListItemText, Menu, Icon, Dialog, DialogTitle, DialogContent, DialogActions, Tooltip } from "@mui/material";
 import { alpha } from '@mui/material/styles';
-import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
-import RemoveIcon from '@mui/icons-material/Remove';
 import EastIcon from '@mui/icons-material/East';
 import SettingsIcon from '@mui/icons-material/Settings';
-import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
@@ -17,8 +14,7 @@ import PauseOutlinedIcon from '@mui/icons-material/PauseOutlined';
 import PlayCircleOutlinedIcon from '@mui/icons-material/PlayCircleOutlined';
 import * as SignalR from '@microsoft/signalr';
 import MemoryIcon from '@mui/icons-material/Memory';
-
-import TextField from '@mui/material/TextField';
+import NoteAddOutlinedIcon from '@mui/icons-material/NoteAddOutlined';
 import { DatePicker, DateTimePicker, TimePicker } from '@mui/x-date-pickers';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -26,7 +22,6 @@ import dayjs from 'dayjs';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import 'dayjs/locale/en-gb'; // or any locale that starts weeks on Monday
-import { Newspaper } from '@mui/icons-material';
 
 dayjs.extend(weekOfYear);
 dayjs.extend(isoWeek);
@@ -34,20 +29,23 @@ dayjs.extend(isoWeek);
 function Request(
     {
         id = '',
-        requestCreatingDate,
-        startDate: propStartDate,
-        endDate: propEndDate,
+        raportCreationDate,
+        raportCompletedDate,
+        startDate,
+        endDate,
+        message,
         status = {
             id: '',
             name: '',
             description: ''
         },
-        raport = {},
         period = {
             id: '',
             name: '',
             hours: 0
         },
+        requestedMeasurements,
+        requestedLocations,
         onSuspend,
         onDelete // Callback for delete action
     }
@@ -55,21 +53,25 @@ function Request(
     // Option 1: Store all props in state
     const [requestData, setRequestData] = React.useState({
         id,
-        requestCreatingDate,
-        startDate: propStartDate,
-        endDate: propEndDate,
+        raportCreationDate,
+        raportCompletedDate,
+        startDate,
+        endDate,
+        message,
+        period,
         status,
-        raport,
-        period
+        requestedMeasurements,
+        requestedLocations
     });
+
     const [editName, setEditName] = React.useState(status.name);
     const [editPeriodId, setEditPeriodId] = React.useState(period.id || '');
 
     // Date picker states
-    const [editStartDate, setEditStartDate] = React.useState(new Date(propStartDate));
-    const [editEndDate, setEditEndDate] = React.useState(new Date(propEndDate));
-    const [editStartTime, setEditStartTime] = React.useState(new Date(propStartDate).getHours());
-    const [editEndTime, setEditEndTime] = React.useState(new Date(propEndDate).getHours());
+    const [editStartDate, setEditStartDate] = React.useState(new Date(startDate));
+    const [editEndDate, setEditEndDate] = React.useState(new Date(endDate));
+    const [editStartTime, setEditStartTime] = React.useState(new Date(startDate).getHours());
+    const [editEndTime, setEditEndTime] = React.useState(new Date(endDate).getHours());
     const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
 
     //  Settings edit values
@@ -110,18 +112,21 @@ function Request(
     React.useEffect(() => {
         setRequestData({
             id,
-            requestCreatingDate,
-            startDate: propStartDate,
-            endDate: propEndDate,
+            raportCreationDate,
+            raportCompletedDate,
+            startDate,
+            endDate,
+            message,
+            period,
             status,
-            raport,
-            period
+            requestedMeasurements,
+            requestedLocations
         });
-    }, [id, requestCreatingDate, propStartDate, propEndDate, status, raport, period]);
+    }, [id, raportCreationDate, raportCompletedDate, startDate, endDate, message, period, status, requestedMeasurements, requestedLocations]);
 
     React.useEffect(() => {
         if (settingsDialogOpen) {
-            fetch('https://localhost:6066/raports/periods/all')
+            fetch('https://localhost:6063/raports/periods/all')
                 .then(res => res.json())
                 .then(data => {
                     setSettingsPossiblePeriods(data);
@@ -152,70 +157,70 @@ function Request(
     }, [settingsDialogOpen, requestData.period.id]);
 
     React.useEffect(() => {
-        try{
+        try {
 
             const connection = new SignalR.HubConnectionBuilder()
-            .withUrl('https://localhost:6066/raportshub')
-            .configureLogging(SignalR.LogLevel.None)
-            .withAutomaticReconnect()
-            .build();
-            
+                .withUrl('https://localhost:6063/raportshub')
+                .configureLogging(SignalR.LogLevel.None)
+                .withAutomaticReconnect()
+                .build();
+
             connection.start()
-            .then(() => {
-                connection.on('RequestStatusChanged', (dto) => {
-                    if (dto.id === requestData.id) {
-                        if (dto.status.name !== 'Suspended' || dto.status.name !== 'Deleted') {
-                            //  If settings dialog is open we have to remove changes and close it.
+                .then(() => {
+                    connection.on('RaportStatusChanged', (dto) => {
+                        if (dto.id === requestData.id) {
+                            if (dto.status.name !== 'Suspended' || dto.status.name !== 'Deleted') {
+                                //  If settings dialog is open we have to remove changes and close it.
+                                CancelRequestSettings_ButtonClick();
+                            }
+
+                            RequestStateChange_Handler(dto.status.name, dto);
+                        }
+                    });
+                    connection.on('RaportUpdated', (dto) => {
+                        if (dto.id === id) {
+                            console.log(`[RAPORT UPDATED] - ${JSON.stringify(dto, null, 2)}`);
+                            // Parent component will re-render with updated props
+                        }
+                    });
+                    connection.on('RaportDeleted', (dto) => {
+
+                        if (dto.id === id) {
                             CancelRequestSettings_ButtonClick();
+                            RequestStateChange_Handler(dto.status.name, dto);
+
+                            if (onDelete) {
+                                onDelete(dto);
+                            }
                         }
-                        
-                        RequestStateChange_Handler(dto.status.name, dto);
-                    }
+                    });
+                })
+                .catch((exception) => {
+                    console.log(exception)
                 });
-                connection.on('RequestUpdated', (dto) => {
-                    if (dto.id === requestData.id) {
-                        console.log(`[REQUEST UPDATED] - ${JSON.stringify(dto, null, 2)}`);
-                        // Update the request data
-                        setRequestData(prevData => ({
-                            ...prevData,
-                            ...dto
-                        }));
-                    }
-                });
-                connection.on('RequestRaportChanged', (dto) => {
-                    if (dto.id === requestData.id) {
-                        console.log(`[REQUEST RAPORT CHANGED] - ${JSON.stringify(dto, null, 2)}`);
-                        // Update the raport data
-                        setRequestData(prevData => ({
-                            ...prevData,
-                            raport: dto.raport
-                        }));
-                    }
-                });
-                connection.on('RequestDeleted', (dto) => {
-                    
-                    if (dto.id === requestData.id) {
-                        CancelRequestSettings_ButtonClick();
-                        RequestStateChange_Handler(dto.status.name, dto);
-                        
-                        if (onDelete) {
-                            onDelete(dto);
-                        }
-                    }
-                });
-            })
-            .catch((exception) => {
-                console.log(exception)
-            });
-            
+
             return () => {
                 connection.stop();
             };
         }
-        catch(exception){
+        catch (exception) {
             console.log(exception);
         }
-        }, [requestData.id]); // Add dependency to re-create connection if ID changes
+    }, [requestData.id]); // Use id from props instead of requestData.id
+
+    // Helper function to format UTC date to Warsaw timezone
+    const formatDateInWarsaw = (utcDateString, options) => {
+        // Ensure the date string is treated as UTC by appending 'Z' if not present
+        let dateStr = utcDateString;
+        if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('Z')) {
+            dateStr = dateStr + 'Z';
+        }
+        const date = new Date(dateStr);
+        return date.toLocaleString('en-US', {
+            ...options,
+            timeZone: 'Europe/Warsaw'
+        });
+    };
 
     //  Render status bulb
     const RenderButtons = () => {
@@ -239,9 +244,9 @@ function Request(
             case 'Failed':
                 return <Stack direction="row" alignContent="center" alignItems="center" spacing={1}
                     sx={{}}>
+                    {RenderDumyButton()}
                     {RenderRefreshButton()}
                     {RenderInfoButton()}
-                    {RenderSettingsButton()}
                     {RenderDeleteButton()}
                 </Stack>
             case 'Processing':
@@ -264,8 +269,8 @@ function Request(
                 return <Stack direction="row" alignContent="center" alignItems="center" spacing={1}
                     sx={{}}>
                     {RenderDumyButton()}
+                    {RenderDumyButton()}
                     {RenderPlayButton()}
-                    {RenderSettingsButton()}
                     {RenderDeleteButton()}
                 </Stack>
             default:
@@ -318,25 +323,28 @@ function Request(
     }
 
     const RenderInfoButton = () => {
-        return <IconButton size="small"
-            sx={(theme) => ({
-                backgroundColor: 'transparent',
-                color: theme.palette.primary.main,
-                transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
-                '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.12),
+        return <Tooltip title={`${requestData.message}`}>
+            <IconButton size="small"
+                sx={(theme) => ({
+                    backgroundColor: 'transparent',
                     color: theme.palette.primary.main,
-                },
-                '&:active': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.18),
-                },
-            })}>
-            <InfoOutlinedIcon />
-        </IconButton>
+                    transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
+                    '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                        color: theme.palette.primary.main,
+                    },
+                    '&:active': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.18),
+                    },
+                })}>
+                <InfoOutlinedIcon />
+            </IconButton>
+        </Tooltip>
     }
 
     const RenderRefreshButton = () => {
         return <IconButton size="small"
+            onClick={RetryRaport_ButtonClick}
             sx={(theme) => ({
                 backgroundColor: 'transparent',
                 color: theme.palette.primary.main,
@@ -355,6 +363,7 @@ function Request(
 
     const RenderDownloadButton = () => {
         return <IconButton size="small"
+            onClick={DownloadRaport_ButtonClick}
             sx={(theme) => ({
                 backgroundColor: 'transparent',
                 color: theme.palette.customgreen.main,
@@ -413,7 +422,7 @@ function Request(
 
     //  ---------- Request state change handlers
     const RequestStateChange_Handler = (newState, updatedData = null) => {
-        console.log(newState);
+        console.log(updatedData);
         switch (newState) {
             case 'Suspended':
                 setIsSuspending(true);
@@ -556,6 +565,66 @@ function Request(
         setSuspendSuccess(null);
     };
 
+    //  ---------- Retry raport
+    const RetryRaport_ButtonClick = async () => {
+        try {
+            const params = new URLSearchParams({
+                RaportID: requestData.id.toString()
+            });
+
+            const response = await fetch(`https://localhost:6063/raports/raport/retry?${params.toString()}`, {
+                method: 'PUT'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to retry raport');
+            }
+
+            const responseData = await response.json();
+            console.log('[RAPORT RETRY] Success:', responseData);
+        } catch (error) {
+            console.error('[RAPORT RETRY] Error:', error);
+        }
+    };
+
+    //  ---------- Download raport
+    const DownloadRaport_ButtonClick = async () => {
+        try {
+            const response = await fetch(`https://localhost:6063/raports/raports/download/${requestData.id}`);
+
+            if (!response.ok) {
+                throw new Error('Failed to download raport');
+            }
+
+            // Get filename from Content-Disposition header or use default
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = `Raport-${requestData.startDate}.pdf`;
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
+
+            // Get the blob from response
+            const blob = await response.blob();
+
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+
+            // Cleanup
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('[DOWNLOAD RAPORT] Error:', error);
+        }
+    };
+
 
 
     //  ---------- Button Clicks
@@ -564,10 +633,20 @@ function Request(
         setPendingSuccess(null);
 
         try {
-            const response = await fetch(`https://localhost:6066/raports/requests/changestatus/${requestData.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ updatedStatusName: "Pending" })
+            // First, fetch all statuses to get the Pending status ID
+            const statusesResponse = await fetch('https://localhost:6063/raports/statuses/all');
+            if (!statusesResponse.ok) throw new Error('Failed to fetch statuses');
+            const statuses = await statusesResponse.json();
+            const pendingStatus = statuses.find(s => s.name === 'Pending');
+            if (!pendingStatus) throw new Error('Pending status not found');
+
+            const params = new URLSearchParams({
+                RaportID: requestData.id.toString(),
+                StatusID: pendingStatus.id.toString()
+            });
+
+            const response = await fetch(`https://localhost:6063/raports/raport/status?${params.toString()}`, {
+                method: 'PUT'
             });
 
             if (!response.ok) {
@@ -592,10 +671,20 @@ function Request(
         setSuspendSuccess(null);
 
         try {
-            const response = await fetch(`https://localhost:6066/raports/requests/changestatus/${requestData.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ updatedStatusName: "Suspended" })
+            // First, fetch all statuses to get the Suspended status ID
+            const statusesResponse = await fetch('https://localhost:6063/raports/statuses/all');
+            if (!statusesResponse.ok) throw new Error('Failed to fetch statuses');
+            const statuses = await statusesResponse.json();
+            const suspendedStatus = statuses.find(s => s.name === 'Suspended');
+            if (!suspendedStatus) throw new Error('Suspended status not found');
+
+            const params = new URLSearchParams({
+                RaportID: requestData.id.toString(),
+                StatusID: suspendedStatus.id.toString()
+            });
+
+            const response = await fetch(`https://localhost:6063/raports/raport/status?${params.toString()}`, {
+                method: 'PUT'
             });
 
             if (!response.ok) {
@@ -617,11 +706,22 @@ function Request(
         setIsDeleting(true);
         setDeleteSuccess(null);
 
-        // Simulate delete operation
+        // Delete by changing status to Deleted
         try {
-            const response = await fetch(`https://localhost:6066/raports/requests/delete/${requestData.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+            // First, fetch all statuses to get the Deleted status ID
+            const statusesResponse = await fetch('https://localhost:6063/raports/statuses/all');
+            if (!statusesResponse.ok) throw new Error('Failed to fetch statuses');
+            const statuses = await statusesResponse.json();
+            const deletedStatus = statuses.find(s => s.name === 'Deleted' || s.name === 'Cancelled');
+            if (!deletedStatus) throw new Error('Deleted status not found');
+
+            const params = new URLSearchParams({
+                RaportID: requestData.id.toString(),
+                StatusID: deletedStatus.id.toString()
+            });
+
+            const response = await fetch(`https://localhost:6063/raports/raport/status?${params.toString()}`, {
+                method: 'PUT'
             });
 
             if (!response.ok) {
@@ -701,10 +801,15 @@ function Request(
         return;
 
         try {
-            const response = await fetch(`https://localhost:6066/raports/requests/changestatus/${requestData.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ updatedStatusName: "Pending" })
+            const params = new URLSearchParams({
+                RaportID: requestData.id.toString(),
+                StartDate: startingDate.toISOString(),
+                EndDate: endingDate.toISOString(),
+                PeriodID: settingsSelectedPeriod.id.toString()
+            });
+
+            const response = await fetch(`https://localhost:6063/raports/raport?${params.toString()}`, {
+                method: 'PUT'
             });
 
             if (!response.ok) {
@@ -1464,7 +1569,7 @@ function Request(
                     {Bulb(requestData.status.name)}
                     <Box>
                         {requestData.status.name === 'Deleted' ? (<Typography sx={{ textDecoration: "line-through" }}>
-                            {new Date(requestData.requestCreatingDate).toLocaleString('en-US', {
+                            {formatDateInWarsaw(requestData.raportCreationDate, {
                                 weekday: 'long',
                                 year: 'numeric',
                                 month: 'long',
@@ -1474,7 +1579,7 @@ function Request(
                                 hour12: false
                             })}
                         </Typography>) : (<Typography>
-                            {new Date(requestData.requestCreatingDate).toLocaleString('en-US', {
+                            {formatDateInWarsaw(requestData.raportCreationDate, {
                                 weekday: 'long',
                                 year: 'numeric',
                                 month: 'long',
@@ -1502,7 +1607,7 @@ function Request(
                         fontSize: '0.75rem',
                         fontWeight: 500,
                     })}>
-                        {requestData.status.name === 'Deleted' ? (<Typography sx={{ textDecoration: "line-through" }}>{requestData.period.name}</Typography>) : (<Typography>{requestData.period.name}</Typography>) }
+                    {requestData.status.name === 'Deleted' ? (<Typography sx={{ textDecoration: "line-through" }}>{requestData.period.name}</Typography>) : (<Typography>{requestData.period.name}</Typography>)}
                 </Box>
 
                 {/* Date */}
@@ -1516,13 +1621,13 @@ function Request(
                     }}>
                     <Box>
                         {requestData.status.name === 'Deleted' ? (<Typography sx={{ textDecoration: "line-through" }}>
-                            {new Date(requestData.startDate).toLocaleString('en-US', {
+                            {formatDateInWarsaw(requestData.startDate, {
                                 year: 'numeric',
                                 month: 'long',
                                 day: 'numeric'
                             })}
                         </Typography>) : (<Typography>
-                            {new Date(requestData.startDate).toLocaleString('en-US', {
+                            {formatDateInWarsaw(requestData.startDate, {
                                 year: 'numeric',
                                 month: 'long',
                                 day: 'numeric'
@@ -1531,14 +1636,14 @@ function Request(
 
 
                         {requestData.status.name === 'Deleted' ? (<Typography sx={{ textDecoration: "line-through" }}>
-                            {new Date(requestData.startDate).toLocaleString('en-US', {
+                            {formatDateInWarsaw(requestData.startDate, {
                                 weekday: 'short',
                                 hour: '2-digit',
                                 minute: '2-digit',
                                 hour12: false
                             })}
                         </Typography>) : (<Typography>
-                            {new Date(requestData.startDate).toLocaleString('en-US', {
+                            {formatDateInWarsaw(requestData.startDate, {
                                 weekday: 'short',
                                 hour: '2-digit',
                                 minute: '2-digit',
@@ -1551,13 +1656,13 @@ function Request(
 
                     <Box>
                         {requestData.status.name === 'Deleted' ? (<Typography sx={{ textDecoration: "line-through" }}>
-                            {new Date(requestData.endDate).toLocaleString('en-US', {
+                            {formatDateInWarsaw(requestData.endDate, {
                                 year: 'numeric',
                                 month: 'long',
                                 day: 'numeric'
                             })}
                         </Typography>) : (<Typography>
-                            {new Date(requestData.endDate).toLocaleString('en-US', {
+                            {formatDateInWarsaw(requestData.endDate, {
                                 year: 'numeric',
                                 month: 'long',
                                 day: 'numeric'
@@ -1566,14 +1671,14 @@ function Request(
 
 
                         {requestData.status.name === 'Deleted' ? (<Typography sx={{ textDecoration: "line-through" }}>
-                            {new Date(requestData.endDate).toLocaleString('en-US', {
+                            {formatDateInWarsaw(requestData.endDate, {
                                 weekday: 'short',
                                 hour: '2-digit',
                                 minute: '2-digit',
                                 hour12: false
                             })}
                         </Typography>) : (<Typography>
-                            {new Date(requestData.endDate).toLocaleString('en-US', {
+                            {formatDateInWarsaw(requestData.endDate, {
                                 weekday: 'short',
                                 hour: '2-digit',
                                 minute: '2-digit',
@@ -1695,8 +1800,6 @@ function Request(
                     </Button>
                 </DialogActions>
             </Dialog>
-
-
 
             {/* Delete Confirmation Dialog */}
             <Dialog

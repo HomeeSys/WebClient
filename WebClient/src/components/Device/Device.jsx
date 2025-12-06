@@ -21,8 +21,8 @@ function Device(
         deviceNumber = '',
         location = {},
         status = {},
-        timestampConfiguration = {},
-        measurementConfiguration = {},
+        timestamp = {},
+        measurementTypes = [],
         onUpdate
     }) {
     const [DBID, setDBID] = useState(id);
@@ -30,25 +30,46 @@ function Device(
     const [DBDeviceNumber, setDBDeviceNumber] = useState(deviceNumber);
     const [DBLocationId, setDBLocationId] = useState(location.id);
     const [DBLocationName, setDBLocationName] = useState(location.name);
-    const [DBTimestampConfigurationId, setDBTimestampConfigurationId] = useState(timestampConfiguration.id);
-    const [DBTimestampConfigurationValue, setDBTimestampConfigurationValue] = useState(timestampConfiguration.cron);
-    const [DBTimestampConfigurationValueAsText, setDBTimestampConfigurationValueAsText] = useState(cronstrue.toString(timestampConfiguration.cron));
+    const [DBTimestampConfigurationId, setDBTimestampConfigurationId] = useState(timestamp?.id);
+    const [DBTimestampConfigurationValue, setDBTimestampConfigurationValue] = useState(timestamp?.cron);
+    const [DBTimestampConfigurationValueAsText, setDBTimestampConfigurationValueAsText] = useState(
+        timestamp?.cron
+            ? (() => {
+                try {
+                    return cronstrue.toString(timestamp.cron);
+                } catch {
+                    return '';
+                }
+            })()
+            : ''
+    );
     const [DBStatusId, setDBStatusId] = useState(status.id);
     const [DBStatusValue, setDBStatusValue] = useState(status.type);
-    const [DBMeasurementConfiguration, setDBMeasurementConfiguration] = useState(measurementConfiguration);
-    const [editMeasurementConfig, setEditMeasurementConfig] = useState(measurementConfiguration);
+    // Convert measurementTypes array to boolean map {id: true/false}
+    const [DBMeasurementConfiguration, setDBMeasurementConfiguration] = useState(
+        measurementTypes.reduce((acc, mt) => ({ ...acc, [mt.id]: true }), {})
+    );
+    const [editMeasurementConfig, setEditMeasurementConfig] = useState(
+        measurementTypes.reduce((acc, mt) => ({ ...acc, [mt.id]: true }), {})
+    );
 
-    const [cronAsText, setCronAsText] = useState(timestampConfiguration.cron);
+    const [cronAsText, setCronAsText] = useState(timestamp?.cron || '');
     const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
     const [settingsLoading, setSettingsLoading] = useState(false);
     const [settingsTab, setSettingsTab] = useState(0);
     const [editName, setEditName] = useState(name);
     const [editLocationId, setEditLocationId] = useState(DBLocationId ?? '');
     const [editTimestampConfigId, setEditTimestampConfigId] = useState(DBTimestampConfigurationId ?? '');
-    const [editCron, setEditCron] = useState(timestampConfiguration.cron);
+    const [editCron, setEditCron] = useState(timestamp?.cron || '');
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleteLoading, setDeleteLoading] = useState(false);
-    const cronText = timestampConfiguration.cron ? cronstrue.toString(timestampConfiguration.cron, { locale: 'en' }) : '';
+    const cronText = timestamp?.cron ? (() => {
+        try {
+            return cronstrue.toString(timestamp.cron, { locale: 'en' });
+        } catch {
+            return '';
+        }
+    })() : '';
 
     const [loadingDisable, setLoadingDisable] = useState(false);
     const [loadingPowerOn, setLoadingPowerOn] = useState(false);
@@ -64,33 +85,15 @@ function Device(
     const [speedDialOpen, setSpeedDialOpen] = useState(false);
     const [possibleLocations, setPossibleLocations] = useState([]);
     const [possibleTimestampsConfigs, setpossibleTimestampsConfigs] = useState([]);
-    const possibleMeasurements = [
-        { id: 'temperature', label: 'Temperature' },
-        { id: 'humidity', label: 'Humidity' },
-        { id: 'carbonDioxide', label: 'Carbon Dioxide (CO₂)' },
-        { id: 'volatileOrganicCompounds', label: 'Volatile Organic Compounds (VOC)' },
-        { id: 'pM1', label: 'Particulate Matter 1µm (PM1)' },
-        { id: 'pM25', label: 'Particulate Matter 2.5µm (PM2.5)' },
-        { id: 'pM10', label: 'Particulate Matter 10µm (PM10)' },
-        { id: 'formaldehyde', label: 'Formaldehyde' },
-        { id: 'carbonMonoxide', label: 'Carbon Monoxide (CO)' },
-        { id: 'ozone', label: 'Ozone (O₃)' },
-        { id: 'ammonia', label: 'Ammonia (NH₃)' },
-        { id: 'airflow', label: 'Airflow' },
-        { id: 'airIonizationLevel', label: 'Air Ionization Level' },
-        { id: 'oxygen', label: 'Oxygen (O₂)' },
-        { id: 'radon', label: 'Radon' },
-        { id: 'illuminance', label: 'Illuminance' },
-        { id: 'soundLevel', label: 'Sound Level' }
-    ];
+    const [possibleMeasurementTypes, setPossibleMeasurementTypes] = useState([]);
     const MENU_ITEM_HEIGHT = 40;
     const MENU_ITEM_PADDING_TOP = 8;
     const selectMenuProps = {
-      PaperProps: {
-        style: {
-          maxHeight: MENU_ITEM_HEIGHT * 5 + MENU_ITEM_PADDING_TOP,
+        PaperProps: {
+            style: {
+                maxHeight: MENU_ITEM_HEIGHT * 5 + MENU_ITEM_PADDING_TOP,
+            },
         },
-      },
     };
 
     useEffect(() => {
@@ -100,10 +103,15 @@ function Device(
                 .then(data => setPossibleLocations(data))
                 .catch(() => setPossibleLocations([]));
 
-            fetch('https://localhost:6061/devices/timestampconfigurations/all')
+            fetch('https://localhost:6061/devices/timestamps/all')
                 .then(res => res.json())
                 .then(data => setpossibleTimestampsConfigs(data))
                 .catch(() => setpossibleTimestampsConfigs([]));
+
+            fetch('https://localhost:6061/devices/measurementtypes/all')
+                .then(res => res.json())
+                .then(data => setPossibleMeasurementTypes(data))
+                .catch(() => setPossibleMeasurementTypes([]));
         }
     }, [settingsDialogOpen]);
 
@@ -114,50 +122,48 @@ function Device(
             .withAutomaticReconnect()
             .build();
 
-            try{
-                connection.start()
-                    .then(() => {
-                        connection.on('DeviceUpdated', (deviceData) => {
-                            if (DBID === deviceData.id) {
-                                UpdateDevice(deviceData);
-                            }
-                        });
-                    })
-                    .catch((error)=>{
-                        console.log(`[DEVICEHUB] - ${error}`);
+        try {
+            connection.start()
+                .then(() => {
+                    connection.on('DeviceUpdated', (deviceData) => {
+                        if (DBID === deviceData.id) {
+                            UpdateDevice(deviceData);
+                        }
                     });
-            }
-            catch (error){
-                console.log(`[DEVICEHUB] - ${error}`);
-            }
-                
+                })
+                .catch((error) => {
+                    console.log(`[DEVICEHUB] - ${error}`);
+                });
+        }
+        catch (error) {
+            console.log(`[DEVICEHUB] - ${error}`);
+        }
+
         return () => {
             connection.stop();
         };
     }, []);
 
-    const RefreshDevice_ButtonClick  = async () => {
+    const RefreshDevice_ButtonClick = async () => {
         setRefreshLoading(true);
         setRefreshAnimating(true);
         try {
-            const response = await fetch(`https://localhost:6061/devices/devicenumber/${DBDeviceNumber}`, {
+            const response = await fetch(`https://localhost:6061/devices/device/?DeviceID=${DBID}`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             });
-            
+
             const responseData = await response.json();
             await new Promise(resolve => setTimeout(resolve, 600));
 
             if (response.ok) {
                 UpdateDevice(responseData);
             }
-        } 
-        catch (error) 
-        {
+        }
+        catch (error) {
             console.log(`[REFRESH DEVICE] - ${error}`);
-        } 
-        finally 
-        {
+        }
+        finally {
             setRefreshLoading(false);
             setTimeout(() => setRefreshAnimating(false), 800);
         }
@@ -174,8 +180,7 @@ function Device(
     };
 
     const ChangeDeviceStatus_ButtonClick = async (desiredStateType) => {
-        try 
-        {
+        try {
             if (desiredStateType === 'Online') {
                 setLoadingPowerOn(true);
                 setPowerOnAnimating(true);
@@ -197,38 +202,41 @@ function Device(
                 setPowerOffAnimating(false);
                 setRefreshAnimating(false);
             }
-            else 
-            {
+            else {
                 throw new Error('Invalid desired state type');
             }
 
-            const response = await fetch(`https://localhost:6061/devices/status/${DBID}`, {
+            // Find the status ID from the desired state type
+            const statusResponse = await fetch('https://localhost:6061/devices/statuses/all');
+            const statuses = await statusResponse.json();
+            const targetStatus = statuses.find(s => s.type === desiredStateType);
+
+            if (!targetStatus) throw new Error('Status not found');
+
+            const response = await fetch(`https://localhost:6061/devices/device/status/?DeviceID=${DBID}&StatusID=${targetStatus.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ StatusType: desiredStateType }),
+                }
             });
-            
+
             const responseData = await response.json();
-            
+
             await new Promise(resolve => setTimeout(resolve, 600));
-            
+
             if (!response.ok) throw new Error('Network response was not ok');
-            
-            setDBStatusId(responseData.statusID);
-            setDBStatusValue(responseData.statusType);
+
+            setDBStatusId(responseData.status.id);
+            setDBStatusValue(responseData.status.type);
 
             let message = 'Device has beed disabled.';
             if (desiredStateType === 'Online') message = 'Device has been turned on.';
             else if (desiredStateType === 'Offline') message = 'Device has been turned off.';
-        } 
-        catch (err) 
-        {
+        }
+        catch (err) {
             console.log(`[DEVICE STATUS CHANGED] - ${err}`);
-        } 
-        finally 
-        {
+        }
+        finally {
             if (desiredStateType === 'Online') {
                 setLoadingPowerOn(false);
                 setTimeout(() => setPowerOnAnimating(false), 800);
@@ -247,8 +255,8 @@ function Device(
                 setLoadingPowerOn(false);
                 throw new Error('Invalid desired state type');
             }
-         }
-     };
+        }
+    };
 
     const getBulbColor = () => {
         if (DBStatusValue === 'Online') return 'customgreen.main';
@@ -262,16 +270,27 @@ function Device(
         setDBName(newData.name);
         setDBLocationId(newData.location.id);
         setDBLocationName(newData.location.name);
-        setDBTimestampConfigurationId(newData.timestampConfiguration.id);
-        setDBTimestampConfigurationValue(newData.timestampConfiguration.cron);
-        setDBTimestampConfigurationValueAsText(cronstrue.toString(newData.timestampConfiguration.cron));
+        setDBTimestampConfigurationId(newData.timestamp?.id);
+        setDBTimestampConfigurationValue(newData.timestamp?.cron);
+        setDBTimestampConfigurationValueAsText(
+            newData.timestamp?.cron
+                ? (() => {
+                    try {
+                        return cronstrue.toString(newData.timestamp.cron);
+                    } catch {
+                        return '';
+                    }
+                })()
+                : ''
+        );
         setDBStatusId(newData.status.id);
         setDBStatusValue(newData.status.type);
-        if (newData.measurementConfiguration) {
-            setDBMeasurementConfiguration(newData.measurementConfiguration);
-            setEditMeasurementConfig(newData.measurementConfiguration);
+        if (newData.measurementTypes) {
+            const measurementMap = newData.measurementTypes.reduce((acc, mt) => ({ ...acc, [mt.id]: true }), {});
+            setDBMeasurementConfiguration(measurementMap);
+            setEditMeasurementConfig(measurementMap);
         }
-     }
+    }
 
     const UpdateDeviceSettings_ButtonClick = async () => {
         const measurementChanged = JSON.stringify(editMeasurementConfig ?? {}) !== JSON.stringify(DBMeasurementConfiguration ?? {});
@@ -282,30 +301,48 @@ function Device(
         setSettingsLoading(true);
         setUpdateSuccess(null);
 
-        const updateDeviceDTO = {};
+        try {
+            const queryParams = new URLSearchParams({ DeviceID: DBID.toString() });
 
-        if (editName !== DBName) {
-            updateDeviceDTO.name = editName;
-        }
-        if (editLocationId !== DBLocationId) {
-            updateDeviceDTO.locationID = editLocationId;
-        }
-        if (editTimestampConfigId !== DBLocationId) {
-            updateDeviceDTO.TimestampConfigurationID = editTimestampConfigId;
-        }
-        if (measurementChanged) {
-            updateDeviceDTO.measurementConfiguration = editMeasurementConfig;
-        }
+            if (editName !== DBName) {
+                queryParams.append('Name', editName);
+            }
+            if (editLocationId !== DBLocationId) {
+                queryParams.append('LocationID', editLocationId.toString());
+            }
+            if (editTimestampConfigId !== DBTimestampConfigurationId) {
+                queryParams.append('TimestampID', editTimestampConfigId.toString());
+            }
 
-        try 
-        {
-            const response = await fetch(`https://localhost:6061/devices/${DBDeviceNumber}`, {
+            const response = await fetch(`https://localhost:6061/devices/device/?${queryParams.toString()}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updateDeviceDTO)
+                headers: { 'Content-Type': 'application/json' }
             });
-            
-            const responseData = await response.json();
+
+            let responseData = await response.json();
+
+            // Update measurement types separately if changed
+            if (measurementChanged && response.ok) {
+                const measurementTypeIDs = Object.entries(editMeasurementConfig)
+                    .filter(([_, enabled]) => enabled)
+                    .map(([id, _]) => parseInt(id))
+                    .filter(id => !isNaN(id));
+
+                const mtParams = new URLSearchParams({
+                    DeviceID: DBID.toString()
+                });
+                measurementTypeIDs.forEach(id => mtParams.append('MeasurementTypeIDs', id));
+
+                const mtResponse = await fetch(`https://localhost:6061/devices/device/measurementtype/?${mtParams.toString()}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (mtResponse.ok) {
+                    responseData = await mtResponse.json();
+                }
+            }
+
             await new Promise(resolve => setTimeout(resolve, 300));
 
             if (response.ok) {
@@ -317,14 +354,12 @@ function Device(
             } else {
                 setUpdateSuccess(false);
             }
-        } 
-        catch (error) 
-        {
+        }
+        catch (error) {
             console.log(`[DEVICE UPDATED] - ${error}`);
             setUpdateSuccess(false);
-        } 
-        finally 
-        {
+        }
+        finally {
             setSettingsLoading(false);
         }
     };
@@ -384,47 +419,47 @@ function Device(
                         <Grid size='auto'>
                             <Stack spacing={1} direction='row'>
                                 {DBStatusValue !== 'Disabled' && (
-                                    <IconButton 
-                                        variant='outlined' 
-                                            sx={(theme) => ({
-                                                backgroundColor: 'transparent',
-                                                color: theme.palette.customgray?.light ?? theme.palette.error.main,
-                                                transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
-                                                '&:hover': {
-                                                    backgroundColor: alpha(theme.palette.customgray?.light ?? theme.palette.error.main, 0.12),
-                                                    color: theme.palette.customgray?.light ?? theme.palette.error.dark,
-                                                },
-                                                '&:active': {
-                                                    backgroundColor: alpha(theme.palette.customgray?.light ?? theme.palette.error.main, 0.18),
-                                                },
-                                            })}
+                                    <IconButton
+                                        variant='outlined'
+                                        sx={(theme) => ({
+                                            backgroundColor: 'transparent',
+                                            color: theme.palette.customgray?.light ?? theme.palette.error.main,
+                                            transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
+                                            '&:hover': {
+                                                backgroundColor: alpha(theme.palette.customgray?.light ?? theme.palette.error.main, 0.12),
+                                                color: theme.palette.customgray?.light ?? theme.palette.error.dark,
+                                            },
+                                            '&:active': {
+                                                backgroundColor: alpha(theme.palette.customgray?.light ?? theme.palette.error.main, 0.18),
+                                            },
+                                        })}
                                         color="inherit"
-                                        onClick={() => ChangeDeviceStatus_ButtonClick('Disabled')} 
+                                        onClick={() => ChangeDeviceStatus_ButtonClick('Disabled')}
                                         disabled={refreshLoading || loadingPowerOn || loadingPowerOff}>
                                         {loadingDisable ? <CircularProgress size={24} sx={{ color: '#888381ff' }} /> : <BlockIcon />}
                                     </IconButton>
                                 )}
-                                <IconButton 
-                                variant='outlined' 
-                                            sx={(theme) => ({
-                                                backgroundColor: 'transparent',
-                                                color: theme.palette.customgray?.light ?? theme.palette.error.main,
-                                                transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
-                                                '&:hover': {
-                                                    backgroundColor: alpha(theme.palette.customgray?.light ?? theme.palette.error.main, 0.12),
-                                                    color: theme.palette.customgray?.light ?? theme.palette.error.dark,
-                                                },
-                                                '&:active': {
-                                                    backgroundColor: alpha(theme.palette.customgray?.light ?? theme.palette.error.main, 0.18),
-                                                },
-                                            })}
-                                        color="inherit"
-                                onClick={() => setSettingsDialogOpen(true)} disabled={refreshLoading || loadingDisable || loadingPowerOff || loadingPowerOn}
+                                <IconButton
+                                    variant='outlined'
+                                    sx={(theme) => ({
+                                        backgroundColor: 'transparent',
+                                        color: theme.palette.customgray?.light ?? theme.palette.error.main,
+                                        transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
+                                        '&:hover': {
+                                            backgroundColor: alpha(theme.palette.customgray?.light ?? theme.palette.error.main, 0.12),
+                                            color: theme.palette.customgray?.light ?? theme.palette.error.dark,
+                                        },
+                                        '&:active': {
+                                            backgroundColor: alpha(theme.palette.customgray?.light ?? theme.palette.error.main, 0.18),
+                                        },
+                                    })}
+                                    color="inherit"
+                                    onClick={() => setSettingsDialogOpen(true)} disabled={refreshLoading || loadingDisable || loadingPowerOff || loadingPowerOn}
                                 >
                                     <SettingsIcon />
                                 </IconButton>
-                                <IconButton 
-                                    variant='outlined' 
+                                <IconButton
+                                    variant='outlined'
                                     sx={(theme) => ({
                                         backgroundColor: 'transparent',
                                         color: theme.palette.customorange?.main ?? theme.palette.error.main,
@@ -432,14 +467,14 @@ function Device(
                                         '&:hover': {
                                             backgroundColor: alpha(theme.palette.customorange?.main ?? theme.palette.error.main, 0.12),
                                             color: theme.palette.customorange?.main ?? theme.palette.error.dark,
-                                            },
+                                        },
                                         '&:active': {
                                             backgroundColor: alpha(theme.palette.customorange?.main ?? theme.palette.error.main, 0.18),
-                                            },
-                                        })}
-                                    color="inherit" 
+                                        },
+                                    })}
+                                    color="inherit"
                                     onClick={RefreshDevice_ButtonClick} disabled={loadingDisable || loadingPowerOn || loadingPowerOff}
-                                    >
+                                >
                                     {refreshLoading ? <CircularProgress size={24} color="warning" /> : <RefreshIcon />}
                                 </IconButton>
                                 {DBStatusValue === 'Disabled' ? (
@@ -449,18 +484,18 @@ function Device(
                                 ) : DBStatusValue === 'Offline' ? (
                                     <IconButton
                                         variant='outlined'
-                                            sx={(theme) => ({
-                                                backgroundColor: 'transparent',
-                                                color: theme.palette.customgreen?.main ?? theme.palette.error.main,
-                                                transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
-                                                '&:hover': {
-                                                    backgroundColor: alpha(theme.palette.customgreen?.main ?? theme.palette.error.main, 0.12),
-                                                    color: theme.palette.customgreen?.main ?? theme.palette.error.dark,
-                                                },
-                                                '&:active': {
-                                                    backgroundColor: alpha(theme.palette.customgreen?.main ?? theme.palette.error.main, 0.18),
-                                                },
-                                            })}
+                                        sx={(theme) => ({
+                                            backgroundColor: 'transparent',
+                                            color: theme.palette.customgreen?.main ?? theme.palette.error.main,
+                                            transition: theme.transitions.create(['background-color', 'color'], { duration: 150 }),
+                                            '&:hover': {
+                                                backgroundColor: alpha(theme.palette.customgreen?.main ?? theme.palette.error.main, 0.12),
+                                                color: theme.palette.customgreen?.main ?? theme.palette.error.dark,
+                                            },
+                                            '&:active': {
+                                                backgroundColor: alpha(theme.palette.customgreen?.main ?? theme.palette.error.main, 0.18),
+                                            },
+                                        })}
                                         color="inherit"
                                         disabled={refreshLoading || loadingDisable || loadingPowerOff || refreshLoading}
                                         onClick={() => ChangeDeviceStatus_ButtonClick('Online')}
@@ -522,24 +557,40 @@ function Device(
             </Grid>
 
             {/* Device modify dialog */}
-            <Dialog 
+            <Dialog
                 open={settingsDialogOpen}
-                onClose={() => !settingsLoading && setSettingsDialogOpen(false)}>
+                onClose={() => !settingsLoading && setSettingsDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                aria-labelledby="measurement-details-dialog-title"
+                aria-describedby="measurement-details-dialog-description"
+                slotProps={{
+                    paper: {
+                        sx: {
+                            border: '0.01rem solid',
+                            borderColor: (theme) => theme.palette.customgray?.light,
+                            borderRadius: 2,
+                        }
+                    }
+                }}
+            >
 
-                <DialogTitle sx={{ display: 'flex', alignItems: 'center', padding: 1, paddingLeft: 1.5, paddingRight: 1.5 }}>
-                <Typography sx={{ }}>Settings</Typography>
-                <IconButton
-                    aria-label="close"
-                    onClick={CancelUpdateDeviceSettings_ButtonClick}
-                    disabled={settingsLoading}
-                    sx={(theme) => ({ ml: 'auto' })}>
-                    <CloseIcon />
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', padding: 1, paddingLeft: 2 }}>
+                    <Box component="span">
+                        <Typography variant='h6'>Settings</Typography>
+                    </Box>
+                    <IconButton
+                        aria-label="close"
+                        onClick={CancelUpdateDeviceSettings_ButtonClick}
+                        sx={(theme) => ({ ml: 'auto' })}
+                    >
+                        <CloseIcon />
                     </IconButton>
                 </DialogTitle>
 
                 <Divider />
 
-                <DialogContent sx={{ display: 'flex', flexDirection: 'column', padding: 0, width: 400, height: 400, minHeight: 0, position: 'relative' }}>
+                <DialogContent sx={{ display: 'flex', flexDirection: 'column', padding: 0, height: 400, minHeight: 0, position: 'relative' }}>
 
                     {/* Update overlay */}
                     <Collapse in={settingsLoading || updateSuccess !== null} timeout={0} unmountOnExit>
@@ -576,14 +627,14 @@ function Device(
                     </Collapse>
 
                     {/* Tab selection */}
-                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1 }}>
-                        <Tabs 
-                            value={settingsTab} 
-                            onChange={(e, v) => setSettingsTab(v)} 
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1, width: '100%' }}>
+                        <Tabs
+                            value={settingsTab}
+                            onChange={(e, v) => setSettingsTab(v)}
                             aria-label="Modify tabs"
                             variant="fullWidth">
                             <Tab label="Properties" disableRipple />
-                            <Tab label="Measurements" disableRipple/>
+                            <Tab label="Measurements" disableRipple />
                         </Tabs>
                     </Box>
 
@@ -609,29 +660,35 @@ function Device(
                     {/* Measurements Tab */}
                     {settingsTab === 1 && (
                         <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pr: 1 }}>
-                            {editMeasurementConfig && Object.keys(editMeasurementConfig).length > 0 ? (
-                                possibleMeasurements.map(pm => {
-                                    const checked = !!editMeasurementConfig[pm.id];
+                            {possibleMeasurementTypes.length > 0 ? (
+                                possibleMeasurementTypes.map(mt => {
+                                    const checked = !!editMeasurementConfig?.[mt.id];
                                     return (
                                         <MenuItem
-                                            key={pm.id}
-                                            onClick={() => toggleMeasurement(pm.id)}
+                                            key={mt.id}
+                                            onClick={() => toggleMeasurement(mt.id)}
                                             disableRipple
                                             dense
-                                            sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}
+                                            sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1,
+                                                mb: 1,
+                                                py: 0.5
+                                            }}
                                         >
                                             <Switch
                                                 size="small"
                                                 checked={checked}
                                                 disabled={settingsLoading}
                                             />
-                                            <ListItemText primary={pm.label} />
+                                            <ListItemText primary={`${mt.name} (${mt.unit})`} />
                                         </MenuItem>
                                     );
                                 })
                             ) : (
                                 <Typography sx={{ color: 'text.secondary', p: 2 }}>
-                                    No measurement configuration available.
+                                    No measurement types available.
                                 </Typography>
                             )}
                         </Box>
@@ -641,8 +698,8 @@ function Device(
                 <Divider />
 
                 <DialogActions sx={{ padding: 1.5, paddingRight: 2 }}>
-                    <Button 
-                        onClick={CancelUpdateDeviceSettings_ButtonClick} 
+                    <Button
+                        onClick={CancelUpdateDeviceSettings_ButtonClick}
                         sx={(theme) => ({
                             backgroundColor: 'transparent',
                             color: theme.palette.customred?.main,
@@ -666,15 +723,15 @@ function Device(
                             },
                         })}
                         disabled={settingsLoading}
-                        >Cancel</Button>
-                    
+                    >Cancel</Button>
+
                     <Button
                         variant="outlined"
                         onClick={UpdateDeviceSettings_ButtonClick}
                         disabled={
-                            editName === DBName && 
-                            editTimestampConfigId === DBTimestampConfigurationId && 
-                            editLocationId === DBLocationId && 
+                            editName === DBName &&
+                            editTimestampConfigId === DBTimestampConfigurationId &&
+                            editLocationId === DBLocationId &&
                             JSON.stringify(editMeasurementConfig) === JSON.stringify(DBMeasurementConfiguration)
                         }
                         sx={(theme) => ({
@@ -707,64 +764,64 @@ function Device(
 
             {/* Component-local overlay (covers only this card) */}
             <Collapse in={powerOffAnimating || powerOnAnimating || disableAnimating || refreshAnimating} timeout={0} unmountOnExit>
-              <Box
-                sx={(theme) => ({
-                 position: 'absolute',
-                  inset: 0,
-                  zIndex: theme.zIndex.modal,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'column',
-                  bgcolor: alpha(theme.palette.background.default, 1),
-                  pointerEvents: 'auto',
-                })}
-              >
-                { (loadingPowerOff || loadingPowerOn || loadingDisable || refreshLoading) ? (
-                  <>
-                    <CircularProgress color="inherit" size={48}/>
-                    <Typography sx={{ mt: 1 }}>
-                      {loadingPowerOff ? 'Powering off device…' : loadingPowerOn ? 'Powering on device…' : loadingDisable ? 'Disabling device…' : 'Refreshing device…'}
-                    </Typography>
-                  </>
-                ) : (
-                  (() => {
-                    if (powerOffAnimating) {
-                      return (
+                <Box
+                    sx={(theme) => ({
+                        position: 'absolute',
+                        inset: 0,
+                        zIndex: theme.zIndex.modal,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'column',
+                        bgcolor: alpha(theme.palette.background.default, 1),
+                        pointerEvents: 'auto',
+                    })}
+                >
+                    {(loadingPowerOff || loadingPowerOn || loadingDisable || refreshLoading) ? (
                         <>
-                          <CheckCircleIcon sx={(theme) => ({ fontSize: 48, color: theme.palette.customred?.main ?? theme.palette.error.main })} />
-                          <Typography sx={{ mt: 1 }}>Device powered off</Typography>
+                            <CircularProgress color="inherit" size={48} />
+                            <Typography sx={{ mt: 1 }}>
+                                {loadingPowerOff ? 'Powering off device…' : loadingPowerOn ? 'Powering on device…' : loadingDisable ? 'Disabling device…' : 'Refreshing device…'}
+                            </Typography>
                         </>
-                      );
-                    }
-                    if (powerOnAnimating) {
-                      return (
-                        <>
-                          <CheckCircleIcon sx={(theme) => ({ fontSize: 48, color: theme.palette.customgreen?.main ?? theme.palette.success.main })} />
-                          <Typography sx={{ mt: 1 }}>Device powered on</Typography>
-                        </>
-                      );
-                    }
-                    if (disableAnimating) {
-                      return (
-                        <>
-                          <CheckCircleIcon sx={(theme) => ({ fontSize: 48, color: theme.palette.customgray?.light ?? theme.palette.text.secondary })} />
-                          <Typography sx={{ mt: 1 }}>Device disabled</Typography>
-                        </>
-                      );
-                    }
-                    if (refreshAnimating) {
-                      return (
-                        <>
-                          <CheckCircleIcon sx={(theme) => ({ fontSize: 48, color: theme.palette.customorange?.main ?? theme.palette.warning.main })} />
-                          <Typography sx={{ mt: 1 }}>Device refreshed</Typography>
-                        </>
-                      );
-                    }
-                    return null;
-                  })()
-                )}
-              </Box>
+                    ) : (
+                        (() => {
+                            if (powerOffAnimating) {
+                                return (
+                                    <>
+                                        <CheckCircleIcon sx={(theme) => ({ fontSize: 48, color: theme.palette.customred?.main ?? theme.palette.error.main })} />
+                                        <Typography sx={{ mt: 1 }}>Device powered off</Typography>
+                                    </>
+                                );
+                            }
+                            if (powerOnAnimating) {
+                                return (
+                                    <>
+                                        <CheckCircleIcon sx={(theme) => ({ fontSize: 48, color: theme.palette.customgreen?.main ?? theme.palette.success.main })} />
+                                        <Typography sx={{ mt: 1 }}>Device powered on</Typography>
+                                    </>
+                                );
+                            }
+                            if (disableAnimating) {
+                                return (
+                                    <>
+                                        <CheckCircleIcon sx={(theme) => ({ fontSize: 48, color: theme.palette.customgray?.light ?? theme.palette.text.secondary })} />
+                                        <Typography sx={{ mt: 1 }}>Device disabled</Typography>
+                                    </>
+                                );
+                            }
+                            if (refreshAnimating) {
+                                return (
+                                    <>
+                                        <CheckCircleIcon sx={(theme) => ({ fontSize: 48, color: theme.palette.customorange?.main ?? theme.palette.warning.main })} />
+                                        <Typography sx={{ mt: 1 }}>Device refreshed</Typography>
+                                    </>
+                                );
+                            }
+                            return null;
+                        })()
+                    )}
+                </Box>
             </Collapse>
         </Box>
     )

@@ -1,7 +1,7 @@
 import MeasurementsLive from './pages/MeasurementsLive';
 import Devices from './pages/Devices';
 import Measurements from './pages/Measurements';
-import Requests from './pages/Requests';
+import Requests from './pages/Raports';
 import Raports from './pages/Raports';
 import './App.css'
 import { Routes, Route } from 'react-router-dom';
@@ -30,6 +30,7 @@ import ListItemText from '@mui/material/ListItemText';
 import InboxIcon from '@mui/icons-material/MoveToInbox';
 import MailIcon from '@mui/icons-material/Mail';
 import { Link } from 'react-router-dom';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import DevicesIcon from '@mui/icons-material/Devices';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
 import InsightsIcon from '@mui/icons-material/Insights';
@@ -389,33 +390,13 @@ function App() {
           </ListItemButton>
         </ListItem>
 
-        {/* Measurements Charts*/}
-        <ListItem disablePadding>
-          <ListItemButton component={Link} to="/measurementslive">
-            <ListItemIcon>
-              <QueryStatsOutlinedIcon />
-            </ListItemIcon>
-            <ListItemText primary="Measurement Charts" />
-          </ListItemButton>
-        </ListItem>
-
         <Divider />
-
-        {/* Requests */}
-        <ListItem disablePadding>
-          <ListItemButton component={Link} to="/requests">
-            <ListItemIcon>
-              <QueueIcon />
-            </ListItemIcon>
-            <ListItemText primary="Requests" />
-          </ListItemButton>
-        </ListItem>
 
         {/* Raports */}
         <ListItem disablePadding>
           <ListItemButton component={Link} to="/raports">
             <ListItemIcon>
-              <InsertDriveFileIcon />
+              <DescriptionOutlinedIcon />
             </ListItemIcon>
             <ListItemText primary="Raports" />
           </ListItemButton>
