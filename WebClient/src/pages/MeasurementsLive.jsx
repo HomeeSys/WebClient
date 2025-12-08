@@ -189,7 +189,7 @@ function MeasurementsLive() {
 
   // Pobierz urządzenia na start
   const fetchDevices = React.useCallback(() => {
-    fetch('https://localhost:6061/devices/all')
+    fetch('https://localhost:6061/devices/devices/all')
       .then(res => res.json())
       .then(data => { setDevices(data); })
       .catch(() => setDevices([]));
@@ -279,7 +279,7 @@ function MeasurementsLive() {
     let connection = null;
 
     connection = new SignalR.HubConnectionBuilder()
-      .withUrl('https://localhost:6063/measurementhub')
+      .withUrl('https://localhost:6062/measurementhub')
       .configureLogging(SignalR.LogLevel.None)
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext) => {
@@ -311,13 +311,16 @@ function MeasurementsLive() {
         //console.log('[SIGNALR] Connected to ReportsHub successfully');
         setMeasurementsServiceResponding(true);
         connection.on('MeasurementCreated', (createdMeasurementSet) => {
+          const device = devices.find(d => d.deviceNumber === createdMeasurementSet.deviceNumber);
+          const location = locations.find(l => l.hash === createdMeasurementSet.locationHash);
+
           setMeasurements(prev => [
             {
               id: createdMeasurementSet.id,
-              date: dayjs(createdMeasurementSet.recordedAt).format('HH:mm:ss - DD MMMM YYYY'),
+              date: dayjs(createdMeasurementSet.measurementCaptureDate).format('HH:mm:ss - DD MMMM YYYY'),
               deviceNumber: createdMeasurementSet.deviceNumber,
-              deviceName: devices.find(x => x.deviceNumber === createdMeasurementSet.deviceNumber)?.name || '',
-              location: locations.find(x => x.id === createdMeasurementSet.locationID)?.name || '',
+              deviceName: device?.name || '',
+              location: location?.name || '',
               details: Object.entries({
                 Temperature: createdMeasurementSet.temperature,
                 Humidity: createdMeasurementSet.humidity,
@@ -1198,17 +1201,17 @@ function MeasurementsLive() {
         onClose={handleClose}
         maxWidth="sm"
         fullWidth
-                        aria-labelledby="measurement-details-dialog-title"
-                aria-describedby="measurement-details-dialog-description"
-                slotProps={{
-                    paper: {
-                        sx: {
-                            border: '0.01rem solid',
-                            borderColor: (theme) => theme.palette.customgray?.light,
-                            borderRadius: 2,
-                        }
-                    }
-                }}
+        aria-labelledby="measurement-details-dialog-title"
+        aria-describedby="measurement-details-dialog-description"
+        slotProps={{
+          paper: {
+            sx: {
+              border: '0.01rem solid',
+              borderColor: (theme) => theme.palette.customgray?.light,
+              borderRadius: 2,
+            }
+          }
+        }}
         TransitionProps={{ onExited: () => setSelectedDetails(null) }}
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', padding: 1, paddingLeft: 2 }}>
@@ -1225,37 +1228,37 @@ function MeasurementsLive() {
         </DialogTitle>
         <Divider />
 
-        <DialogContent sx={{ px: 2, py: 1, height: 500}}>
-            {selectedDetails && (
-              <MeasurementDetailsTable
-                date={selectedDetails.rowData?.date || 'Unknown'}
-                device={{
-                  id: selectedDetails.rowData?.deviceNumber || 'Unknown',
-                  name: selectedDetails.rowData?.deviceName || 'Unknown'
-                }}
-                location={{
-                  id: 'Unknown', // Add locationId to your data structure if available
-                  name: selectedDetails.rowData?.location || 'Unknown'
-                }}
-                temperature={selectedDetails.details?.Temperature || null}
-                humidity={selectedDetails.details?.Humidity || null}
-                co2={selectedDetails.details?.CO2 || null}
-                voc={selectedDetails.details?.VOC || null}
-                pm1={selectedDetails.details?.ParticulateMatter1 || null}
-                pm25={selectedDetails.details?.ParticulateMatter2v5 || null}
-                p10={selectedDetails.details?.ParticulateMatter10 || null}
-                formaldehyde={selectedDetails.details?.Formaldehyde || null}
-                co={selectedDetails.details?.CO || null}
-                o3={selectedDetails.details?.O3 || null}
-                ammonia={selectedDetails.details?.Ammonia || null}
-                airflow={selectedDetails.details?.Airflow || null}
-                ail={selectedDetails.details?.AirIonizationLevel || null}
-                o2={selectedDetails.details?.O2 || null}
-                radon={selectedDetails.details?.Radon || null}
-                illuminance={selectedDetails.details?.Illuminance || null}
-                soundlevel={selectedDetails.details?.SoundLevel || null}
-              />
-            )}
+        <DialogContent sx={{ px: 2, py: 1, height: 500 }}>
+          {selectedDetails && (
+            <MeasurementDetailsTable
+              date={selectedDetails.rowData?.date || 'Unknown'}
+              device={{
+                id: selectedDetails.rowData?.deviceNumber || 'Unknown',
+                name: selectedDetails.rowData?.deviceName || 'Unknown'
+              }}
+              location={{
+                id: 'Unknown', // Add locationId to your data structure if available
+                name: selectedDetails.rowData?.location || 'Unknown'
+              }}
+              temperature={selectedDetails.details?.Temperature || null}
+              humidity={selectedDetails.details?.Humidity || null}
+              co2={selectedDetails.details?.CO2 || null}
+              voc={selectedDetails.details?.VOC || null}
+              pm1={selectedDetails.details?.ParticulateMatter1 || null}
+              pm25={selectedDetails.details?.ParticulateMatter2v5 || null}
+              p10={selectedDetails.details?.ParticulateMatter10 || null}
+              formaldehyde={selectedDetails.details?.Formaldehyde || null}
+              co={selectedDetails.details?.CO || null}
+              o3={selectedDetails.details?.O3 || null}
+              ammonia={selectedDetails.details?.Ammonia || null}
+              airflow={selectedDetails.details?.Airflow || null}
+              ail={selectedDetails.details?.AirIonizationLevel || null}
+              o2={selectedDetails.details?.O2 || null}
+              radon={selectedDetails.details?.Radon || null}
+              illuminance={selectedDetails.details?.Illuminance || null}
+              soundlevel={selectedDetails.details?.SoundLevel || null}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </Box>

@@ -51,10 +51,12 @@ const columns = [
 ];
 
 function FormatDoubleMeasurementValue(value, unit) {
+  if (value === null || value === undefined) return '-';
   return `${value} ${unit}`;
 }
 
 function FormatIntMeasurementValue(value, unit) {
+  if (value === null || value === undefined) return '-';
   return value;
 }
 
@@ -227,7 +229,7 @@ export default function Measurements() {
   };
 
   const FetchDeviceNumbers = React.useCallback(() => {
-    fetch('https://localhost:6061/devices/all')
+    fetch('https://localhost:6061/devices/devices/all')
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
@@ -256,6 +258,7 @@ export default function Measurements() {
     });
 
     if (SearchText) {
+      // DeviceNumber is now a Guid, pass it directly if valid
       params.append('DeviceNumber', SearchText);
     }
     if (filterDayFrom) {
@@ -267,10 +270,11 @@ export default function Measurements() {
       params.append('DateEnd', utcDateEnd);
     }
     if (selectedLocation) {
-      params.append('LocationID', selectedLocation.id);
+      // LocationHash is now a Guid (the location's id)
+      params.append('LocationHash', selectedLocation.hash);
     }
 
-    fetch(`https://localhost:6063/measurements/combined/all?${params.toString()}`)
+    fetch(`https://localhost:6062/measurements/combined/all?${params.toString()}`)
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
@@ -279,7 +283,7 @@ export default function Measurements() {
         setTimeout(() => {
           const mapped = data.items.map((m, idx) => ({
             index: page * rowsPerPage + idx + 1,
-            date: dayjs(m.recordedAt).format('HH:mm - DD MMMM YYYY'),
+            date: dayjs(m.measurementCaptureDate).format('HH:mm:ss - DD MMMM YYYY'),
             deviceNumber: m.deviceNumber,
             deviceName: m.deviceName,
             locationName: m.locationName,
@@ -367,7 +371,7 @@ export default function Measurements() {
     let connection = null;
 
     connection = new SignalR.HubConnectionBuilder()
-      .withUrl('https://localhost:6063/measurementhub')
+      .withUrl('https://localhost:6062/measurementhub')
       .configureLogging(SignalR.LogLevel.None)
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext) => {
@@ -432,7 +436,7 @@ export default function Measurements() {
       {/* Filter controls at top */}
       <Paper sx={{ display: 'flex', m: 1, justifyContent: 'space-between', flexWrap: 'wrap', flexDirection: 'column' }}>
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 1,flexWrap: 'wrap', flexDirection: 'row' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 1, flexWrap: 'wrap', flexDirection: 'row' }}>
           <Box sx={{ gap: 0, m: 1 }}>
             <Typography fontWeight='bold' variant='h5'>Measurements</Typography>
             <Typography variant='subtitle2' sx={{ color: (theme) => theme.palette.custompalette.airsuperiorityblue }}>Browse captured measurements!</Typography>
