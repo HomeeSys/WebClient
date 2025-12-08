@@ -189,14 +189,14 @@ function MeasurementsLive() {
 
   // Pobierz urządzenia na start
   const fetchDevices = React.useCallback(() => {
-    fetch('https://localhost:6061/devices/devices/all')
+    fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/devices/all`)
       .then(res => res.json())
       .then(data => { setDevices(data); })
       .catch(() => setDevices([]));
   }, []);
 
   const fetchLocations = React.useCallback(() => {
-    fetch('https://localhost:6061/devices/locations/all')
+    fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/locations/all`)
       .then(res => res.json())
       .then(data => { setLocations(data); })
       .catch(() => setLocations([]));
@@ -215,7 +215,7 @@ function MeasurementsLive() {
     let connection = null;
 
     connection = new SignalR.HubConnectionBuilder()
-      .withUrl('https://localhost:6061/devicehub')
+      .withUrl(`${import.meta.env.VITE_DEVICES_URL}/devicehub`)
       .configureLogging(SignalR.LogLevel.None)
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext) => {
@@ -279,7 +279,7 @@ function MeasurementsLive() {
     let connection = null;
 
     connection = new SignalR.HubConnectionBuilder()
-      .withUrl('https://localhost:6062/measurementhub')
+      .withUrl(`${import.meta.env.VITE_MEASUREMENTS_URL}/measurementhub`)
       .configureLogging(SignalR.LogLevel.None)
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext) => {

@@ -175,7 +175,7 @@ function Raports() {
 
   //  ---------- Fetch data from backend ----------
   const FetchAllPeriods = () => {
-    fetch('https://localhost:6063/raports/periods/all')
+    fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/periods/all`)
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
@@ -189,7 +189,7 @@ function Raports() {
   };
 
   const FetchAllStatuses = () => {
-    fetch('https://localhost:6063/raports/statuses/all')
+    fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/statuses/all`)
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
@@ -203,7 +203,7 @@ function Raports() {
   };
 
   const FetchAllLocations = () => {
-    fetch('https://localhost:6063/raports/locations/all')
+    fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/locations/all`)
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
@@ -217,7 +217,7 @@ function Raports() {
   };
 
   const FetchAllMeasurements = () => {
-    fetch('https://localhost:6063/raports/measurements/all')
+    fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/measurements/all`)
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
@@ -254,7 +254,7 @@ function Raports() {
       params.append('StatusName', selectedStatus.name);
     }
 
-    fetch(`https://localhost:6063/raports/query?${params.toString()}`)
+    fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/query?${params.toString()}`)
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
@@ -382,7 +382,7 @@ function Raports() {
         params.append('RequestedMeasurementsIDs', measurementId.toString());
       });
 
-      const response = await fetch(`https://localhost:6063/raports/raport?${params.toString()}`, {
+      const response = await fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/raport?${params.toString()}`, {
         method: 'POST'
       });
 
@@ -471,7 +471,7 @@ function Raports() {
     let connection = null;
 
     connection = new SignalR.HubConnectionBuilder()
-      .withUrl('https://localhost:6063/raportshub')
+      .withUrl(`${import.meta.env.VITE_RAPORTS_URL}/raportshub`)
       .configureLogging(SignalR.LogLevel.None)
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext) => {

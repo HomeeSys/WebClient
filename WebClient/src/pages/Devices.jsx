@@ -62,7 +62,7 @@ function Devices() {
     setLoading(true);
     setError(null);
 
-    fetch('https://localhost:6061/devices/devices/all')
+    fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/devices/all`)
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
@@ -78,34 +78,6 @@ function Devices() {
         setError(err.message);
       });
   };
-
-  useEffect(() => {
-    fetchDevices();
-
-    const connection = new SignalR.HubConnectionBuilder()
-      .withUrl('https://localhost:6061/devicehub')
-      .configureLogging(SignalR.LogLevel.None)
-      .withAutomaticReconnect()
-      .build();
-
-    connection.start()
-      .then(() => {
-        connection.on('DeviceCreated', () => {
-          fetchDevices();
-        });
-        connection.on('DeviceDeleted', () => {
-          fetchDevices();
-        });
-        connection.on('DeviceUpdated', (deviceData) => {
-          console.log('DEVICE UPDATED');
-        });
-      })
-      .catch(() => { });
-
-    return () => {
-      connection.stop();
-    };
-  }, []);
 
   const devicesWithCronText = devices.map(device => ({
     ...device,
@@ -134,7 +106,7 @@ function Devices() {
     let connection = null;
 
     connection = new SignalR.HubConnectionBuilder()
-      .withUrl('https://localhost:6062/measurementhub')
+      .withUrl(`${import.meta.env.VITE_DEVICES_URL}/devicehub`)
       .configureLogging(SignalR.LogLevel.None)
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext) => {
@@ -163,11 +135,18 @@ function Devices() {
 
     connection.start()
       .then(() => {
-        //console.log('[SIGNALR] Connected to ReportsHub successfully');
+
         setServerResponding(true);
-        // connection.on('MeasurementCreated', (dto) => {
-        //   CreateSnackAlert_Handler('Measurement captured', `Device captured new measurement. To apply latest changes refresh collection!`);
-        // });
+
+        connection.on('DeviceCreated', () => {
+          fetchDevices();
+        });
+        connection.on('DeviceDeleted', () => {
+          fetchDevices();
+        });
+        connection.on('DeviceUpdated', (deviceData) => {
+          console.log('DEVICE UPDATED');
+        });
       })
       .catch((error) => {
         //console.log('[SIGNALR] Failed to connect to ReportsHub:', error);

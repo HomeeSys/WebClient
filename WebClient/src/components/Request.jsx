@@ -126,7 +126,7 @@ function Request(
 
     React.useEffect(() => {
         if (settingsDialogOpen) {
-            fetch('https://localhost:6063/raports/periods/all')
+            fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/periods/all`)
                 .then(res => res.json())
                 .then(data => {
                     setSettingsPossiblePeriods(data);
@@ -160,7 +160,7 @@ function Request(
         try {
 
             const connection = new SignalR.HubConnectionBuilder()
-                .withUrl('https://localhost:6063/raportshub')
+                .withUrl(`${import.meta.env.VITE_RAPORTS_URL}/raportshub`)
                 .configureLogging(SignalR.LogLevel.None)
                 .withAutomaticReconnect()
                 .build();
@@ -572,7 +572,7 @@ function Request(
                 RaportID: requestData.id.toString()
             });
 
-            const response = await fetch(`https://localhost:6063/raports/raport/retry?${params.toString()}`, {
+            const response = await fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/raport/retry?${params.toString()}`, {
                 method: 'PUT'
             });
 
@@ -590,7 +590,7 @@ function Request(
     //  ---------- Download raport
     const DownloadRaport_ButtonClick = async () => {
         try {
-            const response = await fetch(`https://localhost:6063/raports/raports/download/${requestData.id}`);
+            const response = await fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/raports/download/${requestData.id}`);
 
             if (!response.ok) {
                 throw new Error('Failed to download raport');
@@ -634,7 +634,7 @@ function Request(
 
         try {
             // First, fetch all statuses to get the Pending status ID
-            const statusesResponse = await fetch('https://localhost:6063/raports/statuses/all');
+            const statusesResponse = await fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/statuses/all`);
             if (!statusesResponse.ok) throw new Error('Failed to fetch statuses');
             const statuses = await statusesResponse.json();
             const pendingStatus = statuses.find(s => s.name === 'Pending');
@@ -645,7 +645,7 @@ function Request(
                 StatusID: pendingStatus.id.toString()
             });
 
-            const response = await fetch(`https://localhost:6063/raports/raport/status?${params.toString()}`, {
+            const response = await fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/raport/status?${params.toString()}`, {
                 method: 'PUT'
             });
 
@@ -672,7 +672,7 @@ function Request(
 
         try {
             // First, fetch all statuses to get the Suspended status ID
-            const statusesResponse = await fetch('https://localhost:6063/raports/statuses/all');
+            const statusesResponse = await fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/statuses/all`);
             if (!statusesResponse.ok) throw new Error('Failed to fetch statuses');
             const statuses = await statusesResponse.json();
             const suspendedStatus = statuses.find(s => s.name === 'Suspended');
@@ -683,7 +683,7 @@ function Request(
                 StatusID: suspendedStatus.id.toString()
             });
 
-            const response = await fetch(`https://localhost:6063/raports/raport/status?${params.toString()}`, {
+            const response = await fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/raport/status?${params.toString()}`, {
                 method: 'PUT'
             });
 
@@ -709,7 +709,7 @@ function Request(
         // Delete by changing status to Deleted
         try {
             // First, fetch all statuses to get the Deleted status ID
-            const statusesResponse = await fetch('https://localhost:6063/raports/statuses/all');
+            const statusesResponse = await fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/statuses/all`);
             if (!statusesResponse.ok) throw new Error('Failed to fetch statuses');
             const statuses = await statusesResponse.json();
             const deletedStatus = statuses.find(s => s.name === 'Deleted' || s.name === 'Cancelled');
@@ -720,7 +720,7 @@ function Request(
                 StatusID: deletedStatus.id.toString()
             });
 
-            const response = await fetch(`https://localhost:6063/raports/raport/status?${params.toString()}`, {
+            const response = await fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/raport/status?${params.toString()}`, {
                 method: 'PUT'
             });
 
@@ -808,7 +808,7 @@ function Request(
                 PeriodID: settingsSelectedPeriod.id.toString()
             });
 
-            const response = await fetch(`https://localhost:6063/raports/raport?${params.toString()}`, {
+            const response = await fetch(`${import.meta.env.VITE_RAPORTS_URL}/raports/raport?${params.toString()}`, {
                 method: 'PUT'
             });
 

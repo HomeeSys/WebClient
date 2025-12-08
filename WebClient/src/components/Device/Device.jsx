@@ -98,17 +98,17 @@ function Device(
 
     useEffect(() => {
         if (settingsDialogOpen) {
-            fetch('https://localhost:6061/devices/locations/all')
+            fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/locations/all`)
                 .then(res => res.json())
                 .then(data => setPossibleLocations(data))
                 .catch(() => setPossibleLocations([]));
 
-            fetch('https://localhost:6061/devices/timestamps/all')
+            fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/timestamps/all`)
                 .then(res => res.json())
                 .then(data => setpossibleTimestampsConfigs(data))
                 .catch(() => setpossibleTimestampsConfigs([]));
 
-            fetch('https://localhost:6061/devices/measurementtypes/all')
+            fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/measurementtypes/all`)
                 .then(res => res.json())
                 .then(data => setPossibleMeasurementTypes(data))
                 .catch(() => setPossibleMeasurementTypes([]));
@@ -117,7 +117,7 @@ function Device(
 
     useEffect(() => {
         const connection = new SignalR.HubConnectionBuilder()
-            .withUrl('https://localhost:6061/devicehub')
+            .withUrl(`${import.meta.env.VITE_DEVICES_URL}/devicehub`)
             .configureLogging(SignalR.LogLevel.None)
             .withAutomaticReconnect()
             .build();
@@ -148,7 +148,7 @@ function Device(
         setRefreshLoading(true);
         setRefreshAnimating(true);
         try {
-            const response = await fetch(`https://localhost:6061/devices/device/?DeviceID=${DBID}`, {
+            const response = await fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/device/?DeviceID=${DBID}`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -207,13 +207,13 @@ function Device(
             }
 
             // Find the status ID from the desired state type
-            const statusResponse = await fetch('https://localhost:6061/devices/statuses/all');
+            const statusResponse = await fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/statuses/all`);
             const statuses = await statusResponse.json();
             const targetStatus = statuses.find(s => s.type === desiredStateType);
 
             if (!targetStatus) throw new Error('Status not found');
 
-            const response = await fetch(`https://localhost:6061/devices/device/status/?DeviceID=${DBID}&StatusID=${targetStatus.id}`, {
+            const response = await fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/device/status/?DeviceID=${DBID}&StatusID=${targetStatus.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -314,7 +314,7 @@ function Device(
                 queryParams.append('TimestampID', editTimestampConfigId.toString());
             }
 
-            const response = await fetch(`https://localhost:6061/devices/device/?${queryParams.toString()}`, {
+            const response = await fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/device/?${queryParams.toString()}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -333,7 +333,7 @@ function Device(
                 });
                 measurementTypeIDs.forEach(id => mtParams.append('MeasurementTypeIDs', id));
 
-                const mtResponse = await fetch(`https://localhost:6061/devices/device/measurementtype/?${mtParams.toString()}`, {
+                const mtResponse = await fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/device/measurementtype/?${mtParams.toString()}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' }
                 });

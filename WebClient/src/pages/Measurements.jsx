@@ -214,7 +214,7 @@ export default function Measurements() {
   }, []);
 
   const FetchAllLocations = () => {
-    fetch('https://localhost:6061/devices/locations/all')
+    fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/locations/all`)
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
@@ -229,7 +229,7 @@ export default function Measurements() {
   };
 
   const FetchDeviceNumbers = React.useCallback(() => {
-    fetch('https://localhost:6061/devices/devices/all')
+    fetch(`${import.meta.env.VITE_DEVICES_URL}/devices/devices/all`)
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
@@ -274,7 +274,7 @@ export default function Measurements() {
       params.append('LocationHash', selectedLocation.hash);
     }
 
-    fetch(`https://localhost:6062/measurements/combined/all?${params.toString()}`)
+    fetch(`${import.meta.env.VITE_MEASUREMENTS_URL}/measurements/combined/all?${params.toString()}`)
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
@@ -371,7 +371,7 @@ export default function Measurements() {
     let connection = null;
 
     connection = new SignalR.HubConnectionBuilder()
-      .withUrl('https://localhost:6062/measurementhub')
+      .withUrl(`${import.meta.env.VITE_MEASUREMENTS_URL}/measurementhub`)
       .configureLogging(SignalR.LogLevel.None)
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext) => {
