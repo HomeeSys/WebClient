@@ -1,0 +1,27 @@
+name: Build and publish to Docker Hub
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build_and_push:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          echo "Building Docker image for WebClient"
+          docker build -t darekkrawczyk/homee.website:latest .
+
+      - name: Push Docker image
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.HOMEE_DOCKERHUB_TOKEN }}
+        run: |
+          echo $DOCKERHUB_TOKEN | docker login -u darekkrawczyk --password-stdin
+          docker push darekkrawczyk/homee.website:latest
