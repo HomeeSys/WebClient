@@ -17,7 +17,7 @@ jobs:
       - name: Build Docker image
         run: |
           echo "Building Docker image for WebClient"
-          docker build -t arekkrawczyk/homee.website:latest ./WebClient
+          docker build -t darekkrawczyk/homee.website:latest ./WebClient
 
       - name: Push Docker image
         env:
